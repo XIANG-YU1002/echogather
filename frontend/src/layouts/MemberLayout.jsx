@@ -6,7 +6,6 @@ const NAV_ITEMS = [
   { to: "/profile", label: "個人資料" },
   { to: "/orders", label: "我的訂單" },
   { to: "/favorites", label: "收藏商品" },
-  { to: "/follow-list", label: "跟團清單" },
   { to: "/notifications", label: "通知中心" },
   { to: "/group-leader-application", label: "團主申請" },
 ];

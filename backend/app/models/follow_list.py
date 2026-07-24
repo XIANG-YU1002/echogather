@@ -36,11 +36,20 @@ class FollowListItem(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         ForeignKey("group_buy_product.id", ondelete="RESTRICT"),
         nullable=False,
     )
+    # 所選角色/款式：多角色商品必填、單角色自動帶入、無角色商品為 NULL。
+    chosen_character_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("character.id", ondelete="RESTRICT"),
+        nullable=True,
+    )
     quantity: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
 
     __table_args__ = (
         UniqueConstraint(
-            "follow_list_id", "group_buy_product_id", name="uq_follow_list_item_list_product"
+            "follow_list_id",
+            "group_buy_product_id",
+            "chosen_character_id",
+            name="uq_follow_list_item_list_product_character",
         ),
         CheckConstraint("quantity > 0", name="ck_follow_list_item_quantity_positive"),
     )

@@ -36,6 +36,22 @@ def get_item_by_list_and_product(
     return db.execute(stmt).scalar_one_or_none()
 
 
+def get_item_by_list_product_character(
+    db: Session,
+    follow_list_id: uuid.UUID,
+    group_buy_product_id: uuid.UUID,
+    chosen_character_id: uuid.UUID | None,
+) -> FollowListItem | None:
+    stmt = select(FollowListItem).where(
+        FollowListItem.follow_list_id == follow_list_id,
+        FollowListItem.group_buy_product_id == group_buy_product_id,
+        FollowListItem.chosen_character_id.is_(None)
+        if chosen_character_id is None
+        else FollowListItem.chosen_character_id == chosen_character_id,
+    )
+    return db.execute(stmt).scalar_one_or_none()
+
+
 def count_items(db: Session, follow_list_id: uuid.UUID) -> int:
     stmt = (
         select(func.count())
@@ -53,11 +69,16 @@ def create_follow_list(db: Session, user_id: uuid.UUID, group_buy_id: uuid.UUID)
 
 
 def add_item(
-    db: Session, follow_list_id: uuid.UUID, group_buy_product_id: uuid.UUID, quantity: int
+    db: Session,
+    follow_list_id: uuid.UUID,
+    group_buy_product_id: uuid.UUID,
+    quantity: int,
+    chosen_character_id: uuid.UUID | None = None,
 ) -> FollowListItem:
     item = FollowListItem(
         follow_list_id=follow_list_id,
         group_buy_product_id=group_buy_product_id,
+        chosen_character_id=chosen_character_id,
         quantity=quantity,
     )
     db.add(item)

@@ -5,10 +5,13 @@ import logoIcon from "../../assets/首頁icon.png";
 import AvatarMenu from "./AvatarMenu.jsx";
 import NotificationBell from "./NotificationBell.jsx";
 import SearchInput from "./SearchInput.jsx";
+import { CartIcon } from "./icons.jsx";
+import { useCart } from "../../context/CartContext.jsx";
 
 export default function Header() {
   const { isAuthenticated, user } = useAuth();
   const isAdmin = user?.permissions?.is_admin ?? false;
+  const { count: cartCount } = useCart();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
@@ -39,6 +42,21 @@ export default function Header() {
           </Link>
           {isAuthenticated ? (
             <>
+              {!isAdmin && (
+                <Link
+                  to="/follow-list"
+                  className="notification-bell-trigger"
+                  aria-label={`購物車${cartCount > 0 ? `，${cartCount} 項` : ""}`}
+                  onClick={() => setMobileOpen(false)}
+                >
+                  <CartIcon className="icon-bell" />
+                  {cartCount > 0 && (
+                    <span className="notification-bell-badge">
+                      {cartCount > 99 ? "99+" : cartCount}
+                    </span>
+                  )}
+                </Link>
+              )}
               {!isAdmin && <NotificationBell />}
               <AvatarMenu />
             </>

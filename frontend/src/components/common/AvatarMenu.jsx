@@ -57,9 +57,6 @@ export default function AvatarMenu() {
               <Link to="/favorites" role="menuitem" onClick={() => setOpen(false)}>
                 收藏的商品
               </Link>
-              <Link to="/follow-list" role="menuitem" onClick={() => setOpen(false)}>
-                跟團清單
-              </Link>
               <Link to="/orders" role="menuitem" onClick={() => setOpen(false)}>
                 我的訂單
               </Link>

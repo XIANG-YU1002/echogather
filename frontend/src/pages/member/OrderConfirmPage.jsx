@@ -80,11 +80,11 @@ export default function OrderConfirmPage() {
   if (followList === null || followList.items.length === 0) {
     return (
       <ErrorState
-        title="跟團清單目前是空的"
-        description="請先至跟團清單加入商品後再確認訂單。"
+        title="購物車目前是空的"
+        description="請先至購物車加入商品後再確認訂單。"
       >
         <Link className="btn btn-primary" to="/follow-list">
-          前往跟團清單
+          前往購物車
         </Link>
       </ErrorState>
     );
@@ -101,7 +101,7 @@ export default function OrderConfirmPage() {
       </div>
 
       {!followList.is_submittable && (
-        <Alert type="error">{followList.invalid_reasons.join("；") || "目前跟團清單不可送出訂單。"}</Alert>
+        <Alert type="error">{followList.invalid_reasons.join("；") || "目前購物車不可送出訂單。"}</Alert>
       )}
 
       <div className="checkout-layout">
@@ -131,7 +131,7 @@ export default function OrderConfirmPage() {
               </table>
             </div>
             <p className="helper-text" style={{ marginTop: "0.5rem" }}>
-              如需修改數量，請返回 <Link to="/follow-list">跟團清單</Link>。
+              如需修改數量，請返回 <Link to="/follow-list">購物車</Link>。
             </p>
           </div>
 
@@ -220,7 +220,7 @@ export default function OrderConfirmPage() {
           {submitError && <Alert type="error">{submitError}</Alert>}
 
           <Link className="btn btn-secondary btn-full" to="/follow-list" style={{ marginBottom: "0.75rem" }}>
-            返回跟團清單
+            返回購物車
           </Link>
           <Button
             fullWidth

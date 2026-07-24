@@ -29,12 +29,21 @@ class GroupBuyProductRef(BaseModel):
     primary_image_url: str
 
 
+class GroupBuyProductCharacterOption(BaseModel):
+    character_id: uuid.UUID
+    name: str
+    available_quantity: int
+    is_available: bool
+
+
 class GroupBuyProductItem(BaseModel):
     group_buy_product_id: uuid.UUID
     product: GroupBuyProductRef
     unit_price: Money
     available_quantity: int
     is_available: bool
+    # 多角色商品的可選角色（含各角色剩餘）；無角色商品為空陣列。
+    characters: list[GroupBuyProductCharacterOption] = []
 
 
 class GroupBuyDetailResponse(BaseModel):

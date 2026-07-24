@@ -1,16 +1,16 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from app.models.activity import Activity
 from app.models.enums import ActivityStatus, GroupBuyStatus, PaymentMethod
 from app.models.follow_list import FollowListItem
-from app.models.group_buy import GroupBuy, GroupBuyProduct
+from app.models.group_buy import GroupBuy, GroupBuyProduct, GroupBuyProductCharacter
 from app.models.group_leader import GroupLeaderProfile
 from app.models.order import GroupOrder
-from app.models.product import Product
+from app.models.product import Character, Product
 
 
 def get_by_id(db: Session, group_buy_id: uuid.UUID) -> GroupBuy | None:
@@ -145,6 +145,52 @@ def create_group_buy_product(db: Session, **fields) -> GroupBuyProduct:
     db.add(group_buy_product)
     db.flush()
     return group_buy_product
+
+
+def set_product_character_stock(
+    db: Session, group_buy_product_id: uuid.UUID, quantities: list[tuple[uuid.UUID, int]]
+) -> None:
+    """覆寫某開團商品的每角色庫存（先清空再寫入）。傳入空清單等同清空（無角色商品）。"""
+    db.execute(
+        delete(GroupBuyProductCharacter).where(
+            GroupBuyProductCharacter.group_buy_product_id == group_buy_product_id
+        )
+    )
+    for character_id, max_quantity in quantities:
+        db.add(
+            GroupBuyProductCharacter(
+                group_buy_product_id=group_buy_product_id,
+                character_id=character_id,
+                max_quantity=max_quantity,
+            )
+        )
+    db.flush()
+
+
+def get_product_character_stock(
+    db: Session, group_buy_product_id: uuid.UUID
+) -> list[tuple[Character, int]]:
+    """回傳（角色, 每角色接單上限）清單，依角色名稱排序。無角色商品回傳空清單。"""
+    stmt = (
+        select(Character, GroupBuyProductCharacter.max_quantity)
+        .join(
+            GroupBuyProductCharacter,
+            GroupBuyProductCharacter.character_id == Character.id,
+        )
+        .where(GroupBuyProductCharacter.group_buy_product_id == group_buy_product_id)
+        .order_by(Character.name.asc())
+    )
+    return [(row[0], row[1]) for row in db.execute(stmt).all()]
+
+
+def get_character_max_quantity(
+    db: Session, group_buy_product_id: uuid.UUID, character_id: uuid.UUID
+) -> int | None:
+    stmt = select(GroupBuyProductCharacter.max_quantity).where(
+        GroupBuyProductCharacter.group_buy_product_id == group_buy_product_id,
+        GroupBuyProductCharacter.character_id == character_id,
+    )
+    return db.execute(stmt).scalar_one_or_none()
 
 
 def count_products_in_group_buy(db: Session, group_buy_id: uuid.UUID) -> int:

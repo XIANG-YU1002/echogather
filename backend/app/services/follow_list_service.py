@@ -22,6 +22,7 @@ from app.schemas.follow_list import (
     UpdateFollowListItemResponse,
 )
 from app.schemas.group_leader import GroupLeaderSummary
+from app.schemas.product import CharacterSummary
 from app.services import availability_service
 
 
@@ -30,6 +31,21 @@ def _load_group_buy_product_or_404(db: Session, group_buy_product_id: uuid.UUID)
     if group_buy_product is None:
         raise AppError(404, "GROUP_BUY_PRODUCT_NOT_FOUND", "找不到指定的開團商品。")
     return group_buy_product
+
+
+def _resolve_chosen_character_id(db: Session, product, requested_character_id):
+    """依商品角色數判定所選角色：無角色→None；單角色→自動帶入；多角色→必填且須屬於該商品。"""
+    characters = product_repository.get_characters(db, product.id)
+    if not characters:
+        return None
+    if len(characters) == 1:
+        return characters[0].id
+    character_ids = {c.id for c in characters}
+    if requested_character_id is None:
+        raise AppError(422, "CHARACTER_REQUIRED", "此商品有多個角色/款式，請先選擇一個。")
+    if requested_character_id not in character_ids:
+        raise AppError(422, "INVALID_CHARACTER", "所選角色/款式不屬於此商品。")
+    return requested_character_id
 
 
 def _availability_for(db: Session, group_buy_product):
@@ -61,14 +77,30 @@ def _build_response(db: Session, follow_list: FollowList) -> FollowListResponse:
             db, item.group_buy_product_id
         )
         product = product_repository.get_by_id(db, group_buy_product.product_id)
-        availability = availability_service.get_group_buy_product_availability(
-            db, group_buy, activity, group_buy_product, product.is_active
-        )
+        characters = product_repository.get_characters(db, product.id)
+
+        if item.chosen_character_id is not None:
+            availability = availability_service.get_character_availability(
+                db, group_buy, activity, group_buy_product, item.chosen_character_id, product.is_active
+            )
+        else:
+            availability = availability_service.get_group_buy_product_availability(
+                db, group_buy, activity, group_buy_product, product.is_active
+            )
         item_is_available = availability["is_available"] and item.quantity <= availability[
             "available_quantity"
         ]
         if not item_is_available:
             any_insufficient = True
+
+        chosen_character = next(
+            (
+                CharacterSummary.model_validate(c, from_attributes=True)
+                for c in characters
+                if c.id == item.chosen_character_id
+            ),
+            None,
+        )
 
         subtotal = group_buy_product.unit_price * item.quantity
         estimated_total += subtotal
@@ -76,7 +108,15 @@ def _build_response(db: Session, follow_list: FollowList) -> FollowListResponse:
             FollowListItemResponse(
                 id=item.id,
                 group_buy_product_id=group_buy_product.id,
-                product=FollowListProductRef.model_validate(product, from_attributes=True),
+                product=FollowListProductRef(
+                    id=product.id,
+                    name=product.name,
+                    primary_image_url=product.primary_image_url,
+                    characters=[
+                        CharacterSummary.model_validate(c, from_attributes=True) for c in characters
+                    ],
+                ),
+                chosen_character=chosen_character,
                 unit_price=group_buy_product.unit_price,
                 quantity=item.quantity,
                 estimated_subtotal=subtotal,
@@ -128,7 +168,18 @@ def add_item(
         raise AppError(422, "INVALID_QUANTITY", "數量必須大於 0。")
 
     group_buy_product = _load_group_buy_product_or_404(db, payload.group_buy_product_id)
-    group_buy, _activity, _product, availability = _availability_for(db, group_buy_product)
+    group_buy, activity, product, aggregate_availability = _availability_for(db, group_buy_product)
+
+    chosen_character_id = _resolve_chosen_character_id(db, product, payload.chosen_character_id)
+
+    # 有選角色→以該角色的分角色庫存判定；無角色→用整體庫存。
+    if chosen_character_id is not None:
+        availability = availability_service.get_character_availability(
+            db, group_buy, activity, group_buy_product, chosen_character_id, product.is_active
+        )
+    else:
+        availability = aggregate_availability
+
     if not availability["is_available"]:
         raise AppError(409, "GROUP_BUY_NOT_AVAILABLE", "此開團目前無法跟團。")
 
@@ -150,8 +201,8 @@ def add_item(
 
     existing_item = None
     if existing_list is not None and not replacing:
-        existing_item = follow_list_repository.get_item_by_list_and_product(
-            db, existing_list.id, group_buy_product.id
+        existing_item = follow_list_repository.get_item_by_list_product_character(
+            db, existing_list.id, group_buy_product.id, chosen_character_id
         )
 
     prospective_quantity = (existing_item.quantity if existing_item else 0) + payload.quantity
@@ -181,7 +232,7 @@ def add_item(
         existing_item.quantity = prospective_quantity
     else:
         follow_list_repository.add_item(
-            db, existing_list.id, group_buy_product.id, prospective_quantity
+            db, existing_list.id, group_buy_product.id, prospective_quantity, chosen_character_id
         )
 
     db.commit()
@@ -209,7 +260,14 @@ def update_item_quantity(
     group_buy_product = group_buy_repository.get_group_buy_product_by_id(
         db, item.group_buy_product_id
     )
-    _group_buy, _activity, _product, availability = _availability_for(db, group_buy_product)
+    group_buy, activity, product, aggregate_availability = _availability_for(db, group_buy_product)
+
+    if item.chosen_character_id is not None:
+        availability = availability_service.get_character_availability(
+            db, group_buy, activity, group_buy_product, item.chosen_character_id, product.is_active
+        )
+    else:
+        availability = aggregate_availability
 
     if quantity > availability["available_quantity"]:
         raise AppError(

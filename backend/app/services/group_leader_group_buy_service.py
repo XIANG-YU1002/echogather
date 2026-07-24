@@ -12,6 +12,7 @@ from app.schemas.group_leader_group_buy import (
     AddGroupBuyProductRequest,
     CreateGroupBuyRequest,
     GroupBuyOwnerActivityRef,
+    GroupBuyOwnerCharacterStock,
     GroupBuyOwnerDetailResponse,
     GroupBuyOwnerListItem,
     GroupBuyOwnerProductItem,
@@ -19,6 +20,29 @@ from app.schemas.group_leader_group_buy import (
     UpdateGroupBuyProductRequest,
     UpdateGroupBuySettingsRequest,
 )
+
+
+def _apply_character_stock(db, group_buy_product, product, character_quantities) -> None:
+    """設定開團商品的每角色庫存。
+
+    無角色商品：清空每角色庫存、沿用 max_quantity。
+    有角色商品：未指定的角色以 max_quantity 作為 fallback；並把 max_quantity
+    同步為各角色數量總和（作為整體庫存的去正規化值）。
+    """
+    characters = product_repository.get_characters(db, product.id)
+    if not characters:
+        group_buy_repository.set_product_character_stock(db, group_buy_product.id, [])
+        return
+
+    provided = {cq.character_id: cq.max_quantity for cq in (character_quantities or [])}
+    quantities: list[tuple] = []
+    total = 0
+    for character in characters:
+        qty = provided.get(character.id, group_buy_product.max_quantity)
+        quantities.append((character.id, qty))
+        total += qty
+    group_buy_repository.set_product_character_stock(db, group_buy_product.id, quantities)
+    group_buy_product.max_quantity = total
 
 _FIELDS_EDITABLE_WITHOUT_ORDERS = {
     "payment_method",
@@ -109,13 +133,14 @@ def create_group_buy(
     )
 
     for item, product in resolved_products:
-        group_buy_repository.create_group_buy_product(
+        group_buy_product = group_buy_repository.create_group_buy_product(
             db,
             group_buy_id=group_buy.id,
             product_id=product.id,
             unit_price=item.unit_price,
             max_quantity=item.max_quantity,
         )
+        _apply_character_stock(db, group_buy_product, product, item.character_quantities)
 
     db.commit()
     return get_my_group_buy_detail(db, profile, group_buy.id)
@@ -155,6 +180,24 @@ def get_my_group_buy_detail(
     for group_buy_product, product in group_buy_repository.get_products_for_group_buy(db, group_buy.id):
         occupied = order_repository.get_occupied_quantity(db, group_buy_product.id)
         available = max(group_buy_product.max_quantity - occupied, 0)
+
+        character_stock = []
+        for character, char_max in group_buy_repository.get_product_character_stock(
+            db, group_buy_product.id
+        ):
+            char_occupied = order_repository.get_occupied_quantity(
+                db, group_buy_product.id, character.id
+            )
+            character_stock.append(
+                GroupBuyOwnerCharacterStock(
+                    character_id=character.id,
+                    name=character.name,
+                    max_quantity=char_max,
+                    occupied_quantity=char_occupied,
+                    available_quantity=max(char_max - char_occupied, 0),
+                )
+            )
+
         product_items.append(
             GroupBuyOwnerProductItem(
                 id=group_buy_product.id,
@@ -163,6 +206,7 @@ def get_my_group_buy_detail(
                 max_quantity=group_buy_product.max_quantity,
                 occupied_quantity=occupied,
                 available_quantity=available,
+                character_stock=character_stock,
             )
         )
 
@@ -278,13 +322,14 @@ def add_group_buy_product(
     if not product.is_active:
         raise AppError(409, "PRODUCT_INACTIVE", "商品已下架，無法加入開團。")
 
-    group_buy_repository.create_group_buy_product(
+    group_buy_product = group_buy_repository.create_group_buy_product(
         db,
         group_buy_id=group_buy.id,
         product_id=product.id,
         unit_price=payload.unit_price,
         max_quantity=payload.max_quantity,
     )
+    _apply_character_stock(db, group_buy_product, product, payload.character_quantities)
     db.commit()
     return get_my_group_buy_detail(db, profile, group_buy.id)
 
@@ -321,6 +366,10 @@ def update_group_buy_product(
                     {"occupied_quantity": occupied},
                 )
         group_buy_product.max_quantity = payload.max_quantity
+
+    if "character_quantities" in provided and payload.character_quantities is not None:
+        product = product_repository.get_by_id(db, group_buy_product.product_id)
+        _apply_character_stock(db, group_buy_product, product, payload.character_quantities)
 
     db.commit()
     return get_my_group_buy_detail(db, profile, group_buy.id)

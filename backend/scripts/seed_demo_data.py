@@ -17,7 +17,7 @@ from sqlalchemy import text
 from app.core.database import SessionLocal
 from app.core.security import hash_password
 from app.models.enums import ContactPlatform, GroupBuyStatus, PaymentMethod, UserRole
-from app.models.group_buy import GroupBuy, GroupBuyProduct
+from app.models.group_buy import GroupBuy, GroupBuyProduct, GroupBuyProductCharacter
 from app.models.group_leader import GroupLeaderProfile
 from app.models.user import AppUser
 
@@ -33,6 +33,7 @@ ACCOUNT_SCOPED_TABLES = [
     "follow_list",
     "product_favorite",
     "announcement",
+    "group_buy_product_character",
     "group_buy_product",
     "group_buy",
     "group_leader_application",
@@ -113,22 +114,63 @@ def main() -> None:
         db.add(group_buy)
         db.flush()
 
-        db.add_all(
-            [
-                GroupBuyProduct(
-                    group_buy_id=group_buy.id,
-                    product_id=product_ids[0],
-                    unit_price="65.00",
-                    max_quantity=20,
-                ),
-                GroupBuyProduct(
-                    group_buy_id=group_buy.id,
-                    product_id=product_ids[1],
-                    unit_price="45.00",
-                    max_quantity=15,
-                ),
-            ]
-        )
+        # 商品清單：前兩個目錄商品，外加一個「多角色」商品（若活動中存在），
+        # 以便示範多角色選擇器與分角色庫存。(product_id, 單價, 每角色基準數量)
+        product_plan = [
+            (product_ids[0], "65.00", 20),
+            (product_ids[1], "45.00", 15),
+        ]
+        multi_character_product_id = db.execute(
+            text(
+                """
+                SELECT p.id
+                FROM product p
+                JOIN product_character pc ON pc.product_id = p.id
+                WHERE p.activity_id = :activity_id AND p.is_active = true
+                GROUP BY p.id
+                HAVING count(pc.character_id) >= 2
+                ORDER BY count(pc.character_id) DESC
+                LIMIT 1
+                """
+            ),
+            {"activity_id": open_activity_id},
+        ).scalar()
+        if multi_character_product_id is not None and multi_character_product_id not in product_ids[:2]:
+            product_plan.append((multi_character_product_id, "88.00", 8))
+
+        for product_id, unit_price, base_quantity in product_plan:
+            group_buy_product = GroupBuyProduct(
+                group_buy_id=group_buy.id,
+                product_id=product_id,
+                unit_price=unit_price,
+                max_quantity=base_quantity,
+            )
+            db.add(group_buy_product)
+            db.flush()
+
+            character_ids = (
+                db.execute(
+                    text("SELECT character_id FROM product_character WHERE product_id = :pid"),
+                    {"pid": product_id},
+                )
+                .scalars()
+                .all()
+            )
+            if character_ids:
+                # 每角色給不同數量（base、base+2、base+4…），凸顯分角色庫存；
+                # max_quantity 同步為各角色總和。無角色商品則維持單一 max_quantity。
+                total = 0
+                for index, character_id in enumerate(character_ids):
+                    per_character = base_quantity + index * 2
+                    db.add(
+                        GroupBuyProductCharacter(
+                            group_buy_product_id=group_buy_product.id,
+                            character_id=character_id,
+                            max_quantity=per_character,
+                        )
+                    )
+                    total += per_character
+                group_buy_product.max_quantity = total
 
         db.commit()
 

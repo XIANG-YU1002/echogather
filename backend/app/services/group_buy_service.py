@@ -17,6 +17,7 @@ from app.schemas.group_buy import (
     GroupBuyActivitySummary,
     GroupBuyDetailResponse,
     GroupBuyProductAvailabilityResponse,
+    GroupBuyProductCharacterOption,
     GroupBuyProductItem,
     GroupBuyProductRef,
     GroupBuyRulesResponse,
@@ -59,6 +60,21 @@ def get_group_buy_detail(db: Session, group_buy_id: uuid.UUID) -> GroupBuyDetail
             db, group_buy, activity, group_buy_product, product.is_active
         )
         availabilities.append(availability)
+
+        character_options = []
+        for character in product_repository.get_characters(db, product.id):
+            char_availability = availability_service.get_character_availability(
+                db, group_buy, activity, group_buy_product, character.id, product.is_active
+            )
+            character_options.append(
+                GroupBuyProductCharacterOption(
+                    character_id=character.id,
+                    name=character.name,
+                    available_quantity=char_availability["available_quantity"],
+                    is_available=char_availability["is_available"],
+                )
+            )
+
         product_items.append(
             GroupBuyProductItem(
                 group_buy_product_id=group_buy_product.id,
@@ -66,6 +82,7 @@ def get_group_buy_detail(db: Session, group_buy_id: uuid.UUID) -> GroupBuyDetail
                 unit_price=group_buy_product.unit_price,
                 available_quantity=availability["available_quantity"],
                 is_available=availability["is_available"],
+                characters=character_options,
             )
         )
 

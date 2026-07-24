@@ -5,11 +5,13 @@ from pydantic import BaseModel
 from app.models.enums import ContactPlatform, PaymentMethod
 from app.schemas.common import Money, UTCDateTime
 from app.schemas.group_leader import GroupLeaderSummary
+from app.schemas.product import CharacterSummary
 
 
 class FollowListActivityRef(BaseModel):
     id: uuid.UUID
     name: str
+    has_full_gift: bool = False
 
 
 class FollowListGroupBuySummary(BaseModel):
@@ -32,12 +34,14 @@ class FollowListProductRef(BaseModel):
     id: uuid.UUID
     name: str
     primary_image_url: str
+    characters: list[CharacterSummary] = []
 
 
 class FollowListItemResponse(BaseModel):
     id: uuid.UUID
     group_buy_product_id: uuid.UUID
     product: FollowListProductRef
+    chosen_character: CharacterSummary | None = None
     unit_price: Money
     quantity: int
     estimated_subtotal: Money
@@ -59,6 +63,8 @@ class AddFollowListItemRequest(BaseModel):
     group_buy_product_id: uuid.UUID
     quantity: int
     replace_existing: bool = False
+    # 多角色商品必填；單角色/無角色可省略（後端自動判定）。
+    chosen_character_id: uuid.UUID | None = None
 
 
 class UpdateFollowListItemQuantityRequest(BaseModel):

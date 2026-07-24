@@ -23,6 +23,7 @@ import {
   UsersIcon,
 } from "../components/common/icons.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
+import { useCart } from "../context/CartContext.jsx";
 
 const CONTACT_PLATFORM_LABELS = { facebook: "Facebook", discord: "Discord", line: "LINE" };
 const PAYMENT_METHOD_LABELS = {
@@ -60,13 +61,21 @@ function InfoItem({ icon, label, value, valueClass = "" }) {
 
 function AddToFollowListPanel({ product, groupBuy }) {
   const { isAuthenticated, token, user } = useAuth();
+  const { refresh: refreshCart } = useCart();
   const navigate = useNavigate();
   const location = useLocation();
 
   // 管理員全程在後台作業，前台僅供瀏覽；不提供加入跟團清單，避免產生無用資料。
   const isAdmin = user?.permissions?.is_admin;
 
+  const characters = product.characters ?? [];
+  const hasCharacters = characters.length > 0;
+  const multiCharacter = characters.length >= 2;
+
   const [quantity, setQuantity] = useState(1);
+  const [selectedCharacterId, setSelectedCharacterId] = useState(
+    characters.length === 1 ? characters[0].character_id : null,
+  );
   const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState(null);
   const [conflict, setConflict] = useState(null);
@@ -75,7 +84,23 @@ function AddToFollowListPanel({ product, groupBuy }) {
     return null;
   }
 
-  const maxQuantity = Math.max(product.available_quantity, 1);
+  const selectedCharacter = hasCharacters
+    ? characters.find((c) => c.character_id === selectedCharacterId) ?? null
+    : null;
+  const needsChoice = multiCharacter && !selectedCharacterId;
+  const effectiveAvailable = hasCharacters
+    ? selectedCharacter?.available_quantity ?? 0
+    : product.available_quantity;
+  const effectiveIsAvailable = hasCharacters
+    ? Boolean(selectedCharacter?.is_available)
+    : product.is_available;
+  const maxQuantity = Math.max(effectiveAvailable, 1);
+
+  function chooseCharacter(characterId) {
+    setSelectedCharacterId(characterId);
+    setQuantity(1);
+    setFeedback(null);
+  }
 
   async function submit(replaceExisting) {
     setSubmitting(true);
@@ -86,18 +111,20 @@ function AddToFollowListPanel({ product, groupBuy }) {
           group_buy_product_id: product.group_buy_product_id,
           quantity,
           replace_existing: replaceExisting,
+          chosen_character_id: selectedCharacterId ?? null,
         },
         token,
       );
-      setFeedback({ type: "success", message: "已加入跟團清單。" });
+      setFeedback({ type: "success", message: "已加入購物車。" });
       setConflict(null);
+      refreshCart();
     } catch (err) {
       if (err instanceof ApiError && err.code === "FOLLOW_LIST_GROUP_BUY_CONFLICT") {
         setConflict(true);
       } else if (err instanceof ApiError && err.code === "INSUFFICIENT_AVAILABLE_QUANTITY") {
         setFeedback({ type: "error", message: "目前可接受數量不足，請調整數量後再送出。" });
       } else {
-        setFeedback({ type: "error", message: "加入跟團清單時發生錯誤，請稍後再試。" });
+        setFeedback({ type: "error", message: "加入購物車時發生錯誤，請稍後再試。" });
       }
     } finally {
       setSubmitting(false);
@@ -105,11 +132,15 @@ function AddToFollowListPanel({ product, groupBuy }) {
   }
 
   function handleAddClick() {
+    if (needsChoice) {
+      setFeedback({ type: "error", message: "請先選擇款式／角色。" });
+      return;
+    }
     if (!isAuthenticated) {
       navigate("/login", {
         state: {
           redirectPath: location.pathname + location.search,
-          message: "請先登入後使用跟團清單功能。",
+          message: "請先登入後使用購物車功能。",
         },
       });
       return;
@@ -119,7 +150,7 @@ function AddToFollowListPanel({ product, groupBuy }) {
 
   return (
     <aside className="gb-panel gb-side">
-      <h2 className="gb-side-title">加入跟團清單</h2>
+      <h2 className="gb-side-title">加入購物車</h2>
 
       <div className="gb-side-product">
         {product.product.primary_image_url && (
@@ -140,7 +171,37 @@ function AddToFollowListPanel({ product, groupBuy }) {
         <span className="value is-price">NT$ {product.unit_price}</span>
       </div>
 
-      {product.is_available && (
+      {hasCharacters && (
+        <div className="gb-character-select">
+          <p className="meta-chip-label" style={{ marginBottom: "0.5rem" }}>
+            款式／角色{multiCharacter && <span style={{ color: "var(--color-danger)" }}> *</span>}
+          </p>
+          <div className="gb-character-options">
+            {characters.map((character) => {
+              const active = character.character_id === selectedCharacterId;
+              const soldOut = !character.is_available;
+              return (
+                <button
+                  key={character.character_id}
+                  type="button"
+                  className={`gb-character-option${active ? " active" : ""}${
+                    soldOut ? " sold-out" : ""
+                  }`}
+                  aria-pressed={active}
+                  onClick={() => chooseCharacter(character.character_id)}
+                >
+                  <span className="gb-character-name">{character.name}</span>
+                  <span className="gb-character-remaining">
+                    {soldOut ? "已額滿" : `剩餘 ${character.available_quantity}`}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {effectiveIsAvailable && (
         <>
           <p className="meta-chip-label" style={{ marginBottom: "0.4rem" }}>
             數量
@@ -167,37 +228,44 @@ function AddToFollowListPanel({ product, groupBuy }) {
         </>
       )}
 
-      {product.is_available ? (
+      {needsChoice ? (
+        <div className="gb-status-box no">
+          <span className="status-label">請先選擇款式／角色</span>
+        </div>
+      ) : effectiveIsAvailable ? (
         <div className="gb-status-box ok">
           <span className="status-label">
             <CheckCircleIcon />
             尚可跟團
           </span>
-          <span className="remaining">剩餘 {product.available_quantity} 個</span>
+          <span className="remaining">剩餘 {effectiveAvailable} 個</span>
         </div>
       ) : (
         <div className="gb-status-box no">
           <span className="status-label">
-            {UNAVAILABLE_REASON_LABELS[groupBuy.effective_status] ?? "目前不可跟團"}
+            {hasCharacters
+              ? "此款式／角色目前已額滿"
+              : UNAVAILABLE_REASON_LABELS[groupBuy.effective_status] ?? "目前不可跟團"}
           </span>
         </div>
       )}
 
       {feedback && <Alert type={feedback.type}>{feedback.message}</Alert>}
 
-      {product.is_available ? (
+      {effectiveIsAvailable ? (
         <Button
           className="gb-side-btn"
           fullWidth
           onClick={handleAddClick}
           loading={submitting}
+          disabled={needsChoice}
         >
           <ClipboardIcon />
-          加入跟團清單
+          加入購物車
         </Button>
       ) : (
         <Button className="gb-side-btn" fullWidth disabled>
-          目前不可跟團
+          {needsChoice ? "請先選擇款式／角色" : "目前不可跟團"}
         </Button>
       )}
 
@@ -207,8 +275,8 @@ function AddToFollowListPanel({ product, groupBuy }) {
 
       {conflict && (
         <ConfirmModal
-          title="替換跟團清單"
-          message="目前跟團清單屬於其他開團，確定要清空並改為加入此開團的商品嗎？"
+          title="替換購物車"
+          message="目前購物車屬於其他開團，確定要清空並改為加入此開團的商品嗎？"
           confirmLabel="確定替換"
           onCancel={() => setConflict(null)}
           onConfirm={() => submit(true)}
@@ -400,7 +468,11 @@ export default function GroupBuyDetailPage() {
           )}
         </div>
 
-        <AddToFollowListPanel product={featuredProduct} groupBuy={groupBuy} />
+        <AddToFollowListPanel
+          key={featuredProduct.group_buy_product_id}
+          product={featuredProduct}
+          groupBuy={groupBuy}
+        />
       </div>
     </>
   );

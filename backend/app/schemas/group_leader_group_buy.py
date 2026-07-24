@@ -7,10 +7,17 @@ from app.models.enums import ActivityStatus, ContactPlatform, GroupBuyStatus, Pa
 from app.schemas.common import Money, UTCDateTime, normalize_optional_text
 
 
+class GroupBuyProductCharacterInput(BaseModel):
+    character_id: uuid.UUID
+    max_quantity: int = Field(gt=0)
+
+
 class GroupBuyProductInput(BaseModel):
     product_id: uuid.UUID
     unit_price: Money = Field(ge=0)
     max_quantity: int = Field(gt=0)
+    # 多角色商品的每角色接單上限；未提供時後端以 max_quantity 作為每角色 fallback。
+    character_quantities: list[GroupBuyProductCharacterInput] = []
 
 
 class CreateGroupBuyRequest(BaseModel):
@@ -84,11 +91,13 @@ class AddGroupBuyProductRequest(BaseModel):
     product_id: uuid.UUID
     unit_price: Money = Field(ge=0)
     max_quantity: int = Field(gt=0)
+    character_quantities: list[GroupBuyProductCharacterInput] = []
 
 
 class UpdateGroupBuyProductRequest(BaseModel):
     unit_price: Money | None = Field(default=None, ge=0)
     max_quantity: int | None = Field(default=None, gt=0)
+    character_quantities: list[GroupBuyProductCharacterInput] | None = None
 
 
 class GroupBuyOwnerActivityRef(BaseModel):
@@ -103,6 +112,14 @@ class GroupBuyOwnerProductRef(BaseModel):
     primary_image_url: str
 
 
+class GroupBuyOwnerCharacterStock(BaseModel):
+    character_id: uuid.UUID
+    name: str
+    max_quantity: int
+    occupied_quantity: int
+    available_quantity: int
+
+
 class GroupBuyOwnerProductItem(BaseModel):
     id: uuid.UUID
     product: GroupBuyOwnerProductRef
@@ -110,6 +127,8 @@ class GroupBuyOwnerProductItem(BaseModel):
     max_quantity: int
     occupied_quantity: int
     available_quantity: int
+    # 多角色商品的每角色庫存明細；無角色商品為空陣列。
+    character_stock: list[GroupBuyOwnerCharacterStock] = []
 
 
 class GroupBuyOwnerListItem(BaseModel):

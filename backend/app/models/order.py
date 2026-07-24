@@ -135,6 +135,13 @@ class OrderItem(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
         ForeignKey("group_buy_product.id", ondelete="RESTRICT"),
         nullable=False,
     )
+    # 所選角色/款式：保留 id 供每角色佔用量計算，名稱另存快照供顯示。無角色商品為 NULL。
+    chosen_character_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("character.id", ondelete="RESTRICT"),
+        nullable=True,
+    )
+    chosen_character_name_snapshot: Mapped[str | None] = mapped_column(Text, nullable=True)
     product_name_snapshot: Mapped[str] = mapped_column(String(150), nullable=False)
     image_url_snapshot: Mapped[str] = mapped_column(Text, nullable=False)
     unit_price: Mapped[object] = mapped_column(Numeric(12, 2), nullable=False)
@@ -142,7 +149,12 @@ class OrderItem(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
     subtotal: Mapped[object] = mapped_column(Numeric(12, 2), nullable=False)
 
     __table_args__ = (
-        UniqueConstraint("order_id", "group_buy_product_id", name="uq_order_item_order_product"),
+        UniqueConstraint(
+            "order_id",
+            "group_buy_product_id",
+            "chosen_character_id",
+            name="uq_order_item_order_product_character",
+        ),
         CheckConstraint("unit_price >= 0", name="ck_order_item_unit_price_non_negative"),
         CheckConstraint("quantity > 0", name="ck_order_item_quantity_positive"),
         CheckConstraint("subtotal >= 0", name="ck_order_item_subtotal_non_negative"),

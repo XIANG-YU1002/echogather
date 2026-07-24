@@ -118,3 +118,29 @@ class GroupBuyProduct(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         CheckConstraint("unit_price >= 0", name="ck_group_buy_product_unit_price_non_negative"),
         CheckConstraint("max_quantity > 0", name="ck_group_buy_product_max_quantity_positive"),
     )
+
+
+class GroupBuyProductCharacter(Base):
+    """開團商品的「每角色接單上限」。
+
+    僅「有關聯角色」的商品才會建立此列（每個角色一列）；無角色商品不建立，
+    庫存沿用 `group_buy_product.max_quantity`。單價不分角色（共用 unit_price）。
+    """
+
+    __tablename__ = "group_buy_product_character"
+
+    group_buy_product_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("group_buy_product.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    character_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("character.id", ondelete="RESTRICT"),
+        primary_key=True,
+    )
+    max_quantity: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    __table_args__ = (
+        CheckConstraint("max_quantity > 0", name="ck_gbpc_max_quantity_positive"),
+    )

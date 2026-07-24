@@ -12,8 +12,13 @@ from app.models.user import AppUser
 _NON_OCCUPYING_STATUSES = ("cancelled", "rejected")
 
 
-def get_occupied_quantity(db: Session, group_buy_product_id: uuid.UUID) -> int:
-    """依 Business Rules §20.1：除 cancelled／rejected 外的訂單明細數量總和。"""
+def get_occupied_quantity(
+    db: Session, group_buy_product_id: uuid.UUID, character_id: uuid.UUID | None = None
+) -> int:
+    """依 Business Rules §20.1：除 cancelled／rejected 外的訂單明細數量總和。
+
+    傳入 character_id 時只計算該角色的佔用量（分角色庫存用）；不傳則計整體。
+    """
     stmt = (
         select(func.coalesce(func.sum(OrderItem.quantity), 0))
         .join(GroupOrder, GroupOrder.id == OrderItem.order_id)
@@ -22,6 +27,8 @@ def get_occupied_quantity(db: Session, group_buy_product_id: uuid.UUID) -> int:
             GroupOrder.status.notin_(_NON_OCCUPYING_STATUSES),
         )
     )
+    if character_id is not None:
+        stmt = stmt.where(OrderItem.chosen_character_id == character_id)
     return int(db.execute(stmt).scalar_one())
 
 

@@ -8,6 +8,7 @@ from app.models.user import AppUser
 from app.repositories import (
     activity_repository,
     cancellation_repository,
+    character_repository,
     follow_list_repository,
     group_buy_repository,
     group_leader_repository,
@@ -54,8 +55,20 @@ def create_order(db: Session, user: AppUser, rules_accepted: bool) -> CreateOrde
         if group_buy_product is None:
             raise AppError(404, "GROUP_BUY_PRODUCT_NOT_FOUND", "找不到指定的開團商品。")
         product = product_repository.get_by_id(db, group_buy_product.product_id)
-        occupied = order_repository.get_occupied_quantity(db, group_buy_product.id)
-        available = max(group_buy_product.max_quantity - occupied, 0)
+        if item.chosen_character_id is not None:
+            char_max = (
+                group_buy_repository.get_character_max_quantity(
+                    db, group_buy_product.id, item.chosen_character_id
+                )
+                or 0
+            )
+            occupied = order_repository.get_occupied_quantity(
+                db, group_buy_product.id, item.chosen_character_id
+            )
+            available = max(char_max - occupied, 0)
+        else:
+            occupied = order_repository.get_occupied_quantity(db, group_buy_product.id)
+            available = max(group_buy_product.max_quantity - occupied, 0)
 
         if not product.is_active or item.quantity > available:
             insufficient_items.append(
@@ -105,10 +118,16 @@ def create_order(db: Session, user: AppUser, rules_accepted: bool) -> CreateOrde
 
     for item, group_buy_product, product in resolved:
         subtotal = group_buy_product.unit_price * item.quantity
+        chosen_character_name = None
+        if item.chosen_character_id is not None:
+            chosen_character = character_repository.get_by_id(db, item.chosen_character_id)
+            chosen_character_name = chosen_character.name if chosen_character else None
         order_repository.create_order_item(
             db,
             order_id=order.id,
             group_buy_product_id=group_buy_product.id,
+            chosen_character_id=item.chosen_character_id,
+            chosen_character_name_snapshot=chosen_character_name,
             product_name_snapshot=product.name,
             image_url_snapshot=product.primary_image_url,
             unit_price=group_buy_product.unit_price,
@@ -203,6 +222,7 @@ def get_my_order_detail(db: Session, user: AppUser, order_id: uuid.UUID) -> Orde
                 id=item.id,
                 product_name_snapshot=item.product_name_snapshot,
                 image_url_snapshot=item.image_url_snapshot,
+                chosen_character_name=item.chosen_character_name_snapshot,
                 unit_price=item.unit_price,
                 quantity=item.quantity,
                 subtotal=item.subtotal,

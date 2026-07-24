@@ -34,6 +34,7 @@ class OrderItemDetail(BaseModel):
     id: uuid.UUID
     product_name_snapshot: str
     image_url_snapshot: str
+    chosen_character_name: str | None = None
     unit_price: Money
     quantity: int
     subtotal: Money
