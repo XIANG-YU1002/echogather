@@ -12,6 +12,10 @@ class Settings(BaseSettings):
     upload_directory: str = "./uploads"
     max_upload_file_size_bytes: int = 10 * 1024 * 1024
 
+    supabase_url: str = ""
+    supabase_service_role_key: str = ""
+    supabase_storage_bucket: str = "media"
+
     @property
     def cors_allowed_origins_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_allowed_origins.split(",") if origin.strip()]

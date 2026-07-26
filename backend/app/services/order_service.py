@@ -43,6 +43,11 @@ def create_order(db: Session, user: AppUser, rules_accepted: bool) -> CreateOrde
     if availability_service.compute_group_buy_level_status(group_buy, activity) != "open":
         raise AppError(409, "GROUP_BUY_NOT_AVAILABLE", "此開團目前無法接受訂單。")
 
+    # 團主不可對自己開團的商品下單。
+    own_profile = group_leader_repository.get_profile_by_user_id(db, user.id)
+    if own_profile is not None and own_profile.id == group_buy.group_leader_profile_id:
+        raise AppError(403, "CANNOT_ORDER_OWN_GROUP_BUY", "這是你自己的開團，無法對自己下單。")
+
     product_ids = sorted({item.group_buy_product_id for item in items})
     locked_products = {
         p.id: p for p in group_buy_repository.get_group_buy_products_for_update(db, product_ids)

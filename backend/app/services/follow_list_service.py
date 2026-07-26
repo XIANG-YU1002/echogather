@@ -170,6 +170,11 @@ def add_item(
     group_buy_product = _load_group_buy_product_or_404(db, payload.group_buy_product_id)
     group_buy, activity, product, aggregate_availability = _availability_for(db, group_buy_product)
 
+    # 團主不可將自己開團的商品加入購物車（避免對自己的團下單）。
+    own_profile = group_leader_repository.get_profile_by_user_id(db, user_id)
+    if own_profile is not None and own_profile.id == group_buy.group_leader_profile_id:
+        raise AppError(403, "CANNOT_FOLLOW_OWN_GROUP_BUY", "這是你自己的開團，無法加入購物車。")
+
     chosen_character_id = _resolve_chosen_character_id(db, product, payload.chosen_character_id)
 
     # 有選角色→以該角色的分角色庫存判定；無角色→用整體庫存。

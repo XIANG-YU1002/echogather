@@ -67,6 +67,8 @@ function AddToFollowListPanel({ product, groupBuy }) {
 
   // 管理員全程在後台作業，前台僅供瀏覽；不提供加入跟團清單，避免產生無用資料。
   const isAdmin = user?.permissions?.is_admin;
+  // 團主不可對自己開團的商品下單。
+  const isOwnGroupBuy = Boolean(user?.group_leader?.id) && user.group_leader.id === groupBuy.group_leader.id;
 
   const characters = product.characters ?? [];
   const hasCharacters = characters.length > 0;
@@ -82,6 +84,17 @@ function AddToFollowListPanel({ product, groupBuy }) {
 
   if (isAdmin) {
     return null;
+  }
+
+  if (isOwnGroupBuy) {
+    return (
+      <div className="gb-panel">
+        <div className="info-note">
+          <span aria-hidden="true">ⓘ</span>
+          這是你自己的開團，無法對自己下單。請至團主後台管理此開團與訂單。
+        </div>
+      </div>
+    );
   }
 
   const selectedCharacter = hasCharacters

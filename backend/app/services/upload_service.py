@@ -5,6 +5,7 @@ from pathlib import Path
 
 from PIL import Image, UnidentifiedImageError
 
+from app.core import supabase_storage
 from app.core.config import settings
 from app.core.errors import AppError
 from app.models.enums import UserRole
@@ -70,18 +71,19 @@ def save_image(
     if image.mode not in ("RGB", "RGBA"):
         image = image.convert("RGBA" if "A" in image.getbands() else "RGB")
 
-    now = datetime.now(timezone.utc)
-    relative_dir = Path(category) / f"{now.year:04d}" / f"{now.month:02d}"
-    absolute_dir = Path(settings.upload_directory) / relative_dir
-    absolute_dir.mkdir(parents=True, exist_ok=True)
+    buffer = io.BytesIO()
+    image.save(buffer, format="WEBP")
+    webp_bytes = buffer.getvalue()
 
+    now = datetime.now(timezone.utc)
     stored_filename = f"{uuid.uuid4().hex}.webp"
-    absolute_path = absolute_dir / stored_filename
-    image.save(absolute_path, format="WEBP")
+    object_path = f"{category}/{now.year:04d}/{now.month:02d}/{stored_filename}"
+
+    public_url = supabase_storage.upload_bytes(object_path, webp_bytes, content_type="image/webp")
 
     return {
-        "url": f"/uploads/{relative_dir.as_posix()}/{stored_filename}",
+        "url": public_url,
         "category": category,
         "content_type": "image/webp",
-        "size": absolute_path.stat().st_size,
+        "size": len(webp_bytes),
     }
