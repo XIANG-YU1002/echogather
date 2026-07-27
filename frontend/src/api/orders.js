@@ -4,8 +4,21 @@ export function createOrder(rulesAccepted, token) {
   return apiRequest("/orders", { method: "POST", body: { rules_accepted: rulesAccepted }, token });
 }
 
-export function getMyOrders(token, { status, page = 1, pageSize = 20 } = {}) {
-  return apiRequest("/orders", { token, params: { status, page, page_size: pageSize } });
+export function getMyOrders(
+  token,
+  { status, activityName, groupLeaderName, createdWithinDays, page = 1, pageSize = 20 } = {},
+) {
+  return apiRequest("/orders", {
+    token,
+    params: {
+      status,
+      activity_name: activityName || undefined,
+      group_leader_name: groupLeaderName || undefined,
+      created_within_days: createdWithinDays || undefined,
+      page,
+      page_size: pageSize,
+    },
+  });
 }
 
 export function getMyOrderDetail(orderId, token) {

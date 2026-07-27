@@ -147,7 +147,8 @@ def test_create_group_buy_deadline_in_past(client, db_session):
     assert response.json()["error"]["code"] == "VALIDATION_ERROR"
 
 
-def test_create_group_buy_other_payment_requires_note(client, db_session):
+def test_create_group_buy_rejects_removed_other_payment_method(client, db_session):
+    """付款方式已移除 'other'，只接受 bank_transfer 與 cash_on_delivery。"""
     activity = create_activity(db_session)
     product = create_product(db_session, activity=activity)
     headers = _leader(client, db_session)
@@ -156,6 +157,64 @@ def test_create_group_buy_other_payment_requires_note(client, db_session):
     response = client.post("/api/v1/group-leader/group-buys", json=payload, headers=headers)
 
     assert response.status_code == 422
+
+
+def test_create_group_buy_payment_method_note_is_optional(client, db_session):
+    """付款方式備註為選填，任何付款方式皆可填寫；空白會被正規化成 None。"""
+    activity = create_activity(db_session)
+    product = create_product(db_session, activity=activity)
+    headers = _leader(client, db_session)
+
+    # 匯款 + 有備註
+    payload = _base_payload(
+        product.id,
+        activity_id=str(activity.id),
+        payment_method="bank_transfer",
+        payment_method_note="團費確認後再私訊告知匯款帳號",
+    )
+    response = client.post("/api/v1/group-leader/group-buys", json=payload, headers=headers)
+    assert response.status_code == 201
+    assert response.json()["data"]["payment_method_note"] == "團費確認後再私訊告知匯款帳號"
+
+    # 另一個活動：取貨付款 + 只有空白的備註 -> 存成 None
+    other_activity = create_activity(db_session)
+    other_product = create_product(db_session, activity=other_activity)
+    payload = _base_payload(
+        other_product.id,
+        activity_id=str(other_activity.id),
+        payment_method="cash_on_delivery",
+        payment_method_note="   ",
+    )
+    response = client.post("/api/v1/group-leader/group-buys", json=payload, headers=headers)
+    assert response.status_code == 201
+    assert response.json()["data"]["payment_method_note"] is None
+
+
+def test_create_group_buy_rejects_second_open_group_buy_for_same_activity(client, db_session):
+    """同一團主對同一活動同時只能有一個進行中的開團。"""
+    activity = create_activity(db_session)
+    product = create_product(db_session, activity=activity)
+    headers = _leader(client, db_session)
+
+    payload = _base_payload(product.id, activity_id=str(activity.id))
+    assert client.post("/api/v1/group-leader/group-buys", json=payload, headers=headers).status_code == 201
+
+    second = client.post("/api/v1/group-leader/group-buys", json=payload, headers=headers)
+    assert second.status_code == 409
+    assert second.json()["error"]["code"] == "GROUP_BUY_ALREADY_OPEN_FOR_ACTIVITY"
+
+
+def test_create_group_buy_allows_other_leader_same_activity(client, db_session):
+    """限制只針對同一團主；不同團主對同一活動仍可各自開團。"""
+    activity = create_activity(db_session)
+    product = create_product(db_session, activity=activity)
+
+    payload = _base_payload(product.id, activity_id=str(activity.id))
+    first_headers = _leader(client, db_session)
+    assert client.post("/api/v1/group-leader/group-buys", json=payload, headers=first_headers).status_code == 201
+
+    second_headers = _leader(client, db_session)
+    assert client.post("/api/v1/group-leader/group-buys", json=payload, headers=second_headers).status_code == 201
 
 
 def test_create_group_buy_duplicate_products_rejected(client, db_session):

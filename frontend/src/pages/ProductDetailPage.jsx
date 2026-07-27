@@ -20,6 +20,13 @@ const SORT_OPTIONS = [
   { value: "deadline_desc", label: "截止時間：遠到近" },
 ];
 
+// 空字串 = 未選擇（不限），為預設值
+const PAYMENT_METHOD_OPTIONS = [
+  { value: "", label: "不限" },
+  { value: "cash_on_delivery", label: "取貨付款" },
+  { value: "bank_transfer", label: "匯款" },
+];
+
 const PAGE_SIZE = 10;
 
 export default function ProductDetailPage() {
@@ -36,7 +43,8 @@ export default function ProductDetailPage() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [sort, setSort] = useState("newest");
   const [availableOnly, setAvailableOnly] = useState(false);
-  const [cashOnDeliveryOnly, setCashOnDeliveryOnly] = useState(false);
+  // 空字串代表未選擇（不限付款方式）
+  const [paymentMethod, setPaymentMethod] = useState("");
 
   async function loadProduct() {
     setError(null);
@@ -60,7 +68,7 @@ export default function ProductDetailPage() {
       const response = await getProductGroupBuys(productId, {
         sort,
         availableOnly,
-        cashOnDeliveryOnly,
+        paymentMethod,
         page: pageToLoad,
         pageSize: PAGE_SIZE,
       });
@@ -82,7 +90,7 @@ export default function ProductDetailPage() {
     setPage(1);
     loadGroupBuys(1, false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [productId, sort, availableOnly, cashOnDeliveryOnly]);
+  }, [productId, sort, availableOnly, paymentMethod]);
 
   function handleLoadMore() {
     const next = page + 1;
@@ -181,13 +189,18 @@ export default function ProductDetailPage() {
             />
             只顯示目前可跟團
           </label>
-          <label className="compare-filter-check">
-            <input
-              type="checkbox"
-              checked={cashOnDeliveryOnly}
-              onChange={(event) => setCashOnDeliveryOnly(event.target.checked)}
-            />
-            只顯示可取貨付款
+          <label className="sort-control">
+            付款方式
+            <select
+              value={paymentMethod}
+              onChange={(event) => setPaymentMethod(event.target.value)}
+            >
+              {PAYMENT_METHOD_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
           </label>
         </div>
 

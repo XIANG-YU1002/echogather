@@ -17,6 +17,8 @@ EXPECTED_TABLES = {
     "product_character",
     "group_buy",
     "group_buy_product",
+    # migration 0003_per_character_stock 新增：分角色庫存
+    "group_buy_product_character",
     "follow_list",
     "follow_list_item",
     "group_order",
@@ -28,9 +30,10 @@ EXPECTED_TABLES = {
 }
 
 
-def test_all_18_tables_registered():
+def test_all_tables_registered():
+    """規格 18 張表，加上 migration 0003 新增的 group_buy_product_character 共 19 張。"""
     assert set(Base.metadata.tables.keys()) == EXPECTED_TABLES
-    assert len(EXPECTED_TABLES) == 18
+    assert len(EXPECTED_TABLES) == 19
 
 
 def test_app_user_contact_columns_nullable_and_required_by_check_constraint():
@@ -77,7 +80,8 @@ def test_unique_constraints_exist_for_pending_style_business_rules():
         for constraint in order_item_table.constraints
         if constraint.__class__.__name__ == "UniqueConstraint"
     }
-    assert "uq_order_item_order_product" in unique_names
+    # migration 0003_per_character_stock 起，唯一鍵納入所選角色
+    assert "uq_order_item_order_product_character" in unique_names
 
     favorite_table = Base.metadata.tables["product_favorite"]
     unique_names = {

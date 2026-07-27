@@ -11,9 +11,8 @@ import Button from "../../components/common/Button.jsx";
 import FormField from "../../components/common/FormField.jsx";
 
 const PAYMENT_METHODS = [
-  { value: "bank_transfer", label: "銀行匯款" },
-  { value: "cash_on_delivery", label: "貨到付款／取貨付款" },
-  { value: "other", label: "其他" },
+  { value: "bank_transfer", label: "匯款" },
+  { value: "cash_on_delivery", label: "取貨付款" },
 ];
 const CONTACT_PLATFORMS = [
   { value: "facebook", label: "Facebook" },
@@ -108,7 +107,7 @@ export default function GroupBuyCreatePage() {
             max_quantity: Number(values.max_quantity),
           })),
           payment_method: paymentMethod,
-          payment_method_note: paymentMethod === "other" ? paymentMethodNote : null,
+          payment_method_note: paymentMethodNote.trim() || null,
           requires_second_payment: requiresSecondPayment,
           includes_full_gift: includesFullGift,
           deadline_at: new Date(deadlineAt).toISOString(),
@@ -221,16 +220,18 @@ export default function GroupBuyCreatePage() {
             </select>
           </FormField>
 
-          {paymentMethod === "other" && (
-            <FormField label="付款方式說明" htmlFor="gb-payment-note" required>
-              <input
-                id="gb-payment-note"
-                value={paymentMethodNote}
-                onChange={(event) => setPaymentMethodNote(event.target.value)}
-                required
-              />
-            </FormField>
-          )}
+          <FormField
+            label="付款方式備註（選填）"
+            htmlFor="gb-payment-note"
+            helperText="可補充付款細節，例如：團費確認後再私訊告知匯款帳號、取貨地點與時間、可接受的分期方式等。不填則不會顯示。"
+          >
+            <input
+              id="gb-payment-note"
+              value={paymentMethodNote}
+              onChange={(event) => setPaymentMethodNote(event.target.value)}
+              placeholder="例如：團費確認後再私訊告知匯款帳號"
+            />
+          </FormField>
 
           <label className="group-buy-card-row">
             <input

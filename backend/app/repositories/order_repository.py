@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
@@ -75,11 +75,27 @@ def create_order_item(db: Session, **fields) -> OrderItem:
 
 
 def list_by_user(
-    db: Session, user_id: uuid.UUID, status: OrderStatus | None, page: int, page_size: int
+    db: Session,
+    user_id: uuid.UUID,
+    status: OrderStatus | None,
+    page: int,
+    page_size: int,
+    *,
+    activity_name: str | None = None,
+    group_leader_name: str | None = None,
+    created_within_days: int | None = None,
 ) -> tuple[list[GroupOrder], int]:
+    """依圖 07 篩選卡：狀態、時間範圍、活動名稱、團主名稱（後兩者為不分大小寫的部分比對）。"""
     stmt = select(GroupOrder).where(GroupOrder.user_id == user_id)
     if status is not None:
         stmt = stmt.where(GroupOrder.status == status)
+    if activity_name:
+        stmt = stmt.where(GroupOrder.activity_name_snapshot.ilike(f"%{activity_name}%"))
+    if group_leader_name:
+        stmt = stmt.where(GroupOrder.group_leader_name_snapshot.ilike(f"%{group_leader_name}%"))
+    if created_within_days:
+        since = datetime.now(timezone.utc) - timedelta(days=created_within_days)
+        stmt = stmt.where(GroupOrder.created_at >= since)
 
     total = db.execute(select(func.count()).select_from(stmt.subquery())).scalar_one()
     items = (

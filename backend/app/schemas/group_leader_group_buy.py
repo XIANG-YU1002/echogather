@@ -46,11 +46,11 @@ class CreateGroupBuyRequest(BaseModel):
         return trimmed
 
     @model_validator(mode="after")
-    def _validate_payment_method_note_pair(self) -> "CreateGroupBuyRequest":
-        if self.payment_method == PaymentMethod.OTHER and not self.payment_method_note:
-            raise ValueError("選擇其他付款方式時必須填寫說明。")
-        if self.payment_method != PaymentMethod.OTHER and self.payment_method_note is not None:
-            raise ValueError("非其他付款方式不可填寫付款方式說明。")
+    def _normalize_payment_method_note(self) -> "CreateGroupBuyRequest":
+        """付款方式備註為選填；空白字串一律正規化成 None。"""
+        if self.payment_method_note is not None:
+            trimmed = self.payment_method_note.strip()
+            self.payment_method_note = trimmed or None
         return self
 
     @model_validator(mode="after")

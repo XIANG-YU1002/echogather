@@ -3,6 +3,7 @@ import uuid
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
+from app.models.enums import PaymentMethod
 from app.models.user import AppUser
 from app.repositories import activity_repository, group_buy_repository, product_repository
 from app.schemas.group_leader import GroupLeaderSummary
@@ -61,7 +62,7 @@ def get_product_group_buys(
     *,
     sort: str,
     available_only: bool,
-    cash_on_delivery_only: bool,
+    payment_method: PaymentMethod | None,
     requires_second_payment: bool | None,
     includes_full_gift: bool | None,
     page: int,
@@ -74,7 +75,7 @@ def get_product_group_buys(
     rows = group_buy_repository.list_group_buy_products_for_product(
         db,
         product_id,
-        cash_on_delivery_only=cash_on_delivery_only,
+        payment_method=payment_method,
         requires_second_payment=requires_second_payment,
         includes_full_gift=includes_full_gift,
     )

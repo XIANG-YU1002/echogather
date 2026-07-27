@@ -26,12 +26,22 @@ def create_order(
 @router.get("")
 def get_my_orders(
     status_filter: OrderStatus | None = Query(None, alias="status"),
+    activity_name: str | None = Query(None, max_length=150),
+    group_leader_name: str | None = Query(None, max_length=50),
+    created_within_days: int | None = Query(None, ge=1, le=365),
     pagination: PaginationParams = Depends(),
     current_user: AppUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> dict:
     items, total = order_service.get_my_orders(
-        db, current_user.id, status_filter, pagination.page, pagination.page_size
+        db,
+        current_user.id,
+        status_filter,
+        pagination.page,
+        pagination.page_size,
+        activity_name=activity_name,
+        group_leader_name=group_leader_name,
+        created_within_days=created_within_days,
     )
     return paginated_envelope(
         [i.model_dump(mode="json") for i in items], pagination.page, pagination.page_size, total

@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import PaginationParams, get_current_user_optional, get_db
 from app.core.responses import envelope, paginated_envelope
+from app.models.enums import PaymentMethod
 from app.models.user import AppUser
 from app.schemas.group_buy import GroupBuySortOption
 from app.services import product_service
@@ -27,7 +28,7 @@ def get_product_group_buys(
     product_id: uuid.UUID,
     sort: GroupBuySortOption = Query(GroupBuySortOption.NEWEST),
     available_only: bool = Query(False),
-    cash_on_delivery_only: bool = Query(False),
+    payment_method: PaymentMethod | None = Query(None),
     requires_second_payment: bool | None = Query(None),
     includes_full_gift: bool | None = Query(None),
     pagination: PaginationParams = Depends(),
@@ -38,7 +39,7 @@ def get_product_group_buys(
         product_id,
         sort=sort.value,
         available_only=available_only,
-        cash_on_delivery_only=cash_on_delivery_only,
+        payment_method=payment_method,
         requires_second_payment=requires_second_payment,
         includes_full_gift=includes_full_gift,
         page=pagination.page,

@@ -193,3 +193,63 @@ export function SearchIcon({ className }) {
     </svg>
   );
 }
+
+export function PencilIcon({ className }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <path
+        d="M4 20h4L19.5 8.5a2.1 2.1 0 0 0-3-3L5 17v3Z"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+      />
+      <path d="M14.5 7 17 9.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export function ArrowLeftIcon({ className }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <path d="M19 12H5M11 6l-6 6 6 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/* 聯絡平台品牌圖示：依圖 06 為圓形實心品牌色，故不使用 currentColor。 */
+
+export function FacebookIcon({ className }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <circle cx="12" cy="12" r="12" fill="#1877F2" />
+      <path
+        d="M15.6 12.4h-2.2V19h-2.8v-6.6H9v-2.4h1.6V8.4c0-1.9 1.1-3.1 3.2-3.1h2v2.4h-1.3c-.8 0-1 .3-1 .9v1.4h2.4l-.3 2.4Z"
+        fill="#fff"
+      />
+    </svg>
+  );
+}
+
+export function DiscordIcon({ className }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <circle cx="12" cy="12" r="12" fill="#5865F2" />
+      <path
+        d="M16.6 8.1a9.6 9.6 0 0 0-2.4-.7l-.3.6c-.9-.1-1.8-.1-2.6 0l-.3-.6c-.9.1-1.7.4-2.5.7-1.5 2.2-1.9 4.4-1.7 6.5a9.8 9.8 0 0 0 3 1.5l.6-1c-.3-.1-.7-.3-1-.5l.2-.2a6.9 6.9 0 0 0 5.9 0l.2.2c-.3.2-.6.4-1 .5l.6 1c1.1-.3 2.1-.8 3-1.5.3-2.4-.4-4.6-1.7-6.5Zm-6.3 5.2c-.6 0-1.1-.5-1.1-1.2s.5-1.2 1.1-1.2c.6 0 1.1.5 1.1 1.2s-.5 1.2-1.1 1.2Zm3.4 0c-.6 0-1.1-.5-1.1-1.2s.5-1.2 1.1-1.2c.6 0 1.1.5 1.1 1.2s-.5 1.2-1.1 1.2Z"
+        fill="#fff"
+      />
+    </svg>
+  );
+}
+
+export function LineIcon({ className }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <circle cx="12" cy="12" r="12" fill="#06C755" />
+      <path
+        d="M12 5.2c-3.9 0-7 2.5-7 5.6 0 2.8 2.5 5.1 5.9 5.5.2 0 .5.2.6.4.1.2 0 .5 0 .7l-.1.6c0 .2-.1.7.6.4 1.7-.7 4.2-2.4 5.4-4.1.8-.9 1.2-1.9 1.2-3.5 0-3.1-3.1-5.6-6.6-5.6Zm-2.6 7.4H8c-.2 0-.3-.1-.3-.3V9.9c0-.2.1-.3.3-.3s.3.1.3.3v2.1h1.1c.2 0 .3.1.3.3s-.1.3-.3.3Zm1.3-.3c0 .2-.1.3-.3.3s-.3-.1-.3-.3V9.9c0-.2.1-.3.3-.3s.3.1.3.3v2.4Zm2.9 0c0 .1-.1.3-.2.3h-.1c-.1 0-.2 0-.2-.1l-1.1-1.5v1.3c0 .2-.1.3-.3.3s-.3-.1-.3-.3V9.9c0-.1.1-.3.2-.3h.1c.1 0 .2 0 .2.1l1.1 1.5V9.9c0-.2.1-.3.3-.3s.3.1.3.3v2.4Zm2-1.5c.2 0 .3.1.3.3s-.1.3-.3.3h-1.1v.6h1.1c.2 0 .3.1.3.3s-.1.3-.3.3h-1.4c-.2 0-.3-.1-.3-.3V9.9c0-.2.1-.3.3-.3h1.4c.2 0 .3.1.3.3s-.1.3-.3.3h-1.1v.6h1.1Z"
+        fill="#fff"
+      />
+    </svg>
+  );
+}

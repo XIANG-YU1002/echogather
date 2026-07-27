@@ -96,20 +96,11 @@ class GroupOrder(UUIDPrimaryKeyMixin, TimestampMixin, Base):
             """,
             name="ck_group_order_rejection_reason_pair",
         ),
+        # 付款方式備註為選填快照；有值時不得為空白字串。
         CheckConstraint(
-            """
-            (
-                payment_method_snapshot = 'other'
-                AND payment_method_note_snapshot IS NOT NULL
-                AND length(trim(payment_method_note_snapshot)) > 0
-            )
-            OR
-            (
-                payment_method_snapshot <> 'other'
-                AND payment_method_note_snapshot IS NULL
-            )
-            """,
-            name="ck_group_order_payment_method_note_snapshot_pair",
+            "payment_method_note_snapshot IS NULL "
+            "OR length(trim(payment_method_note_snapshot)) > 0",
+            name="ck_group_order_payment_method_note_snapshot_not_blank",
         ),
         CheckConstraint(
             """

@@ -25,8 +25,10 @@ class OrderListItem(BaseModel):
     activity_name: str
     representative_image_url: str
     item_summary: str
+    item_count: int
     product_total_amount: Money
     status: OrderStatus
+    rejection_reason: str | None = None
     created_at: UTCDateTime
 
 

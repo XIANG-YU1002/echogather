@@ -25,7 +25,6 @@ class GroupBuyStatus(str, enum.Enum):
 class PaymentMethod(str, enum.Enum):
     BANK_TRANSFER = "bank_transfer"
     CASH_ON_DELIVERY = "cash_on_delivery"
-    OTHER = "other"
 
 
 class ContactPlatform(str, enum.Enum):

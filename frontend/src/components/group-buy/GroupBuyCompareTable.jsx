@@ -3,8 +3,7 @@ import { resolveMediaUrl } from "../../api/client.js";
 
 const PAYMENT_METHOD_LABELS = {
   bank_transfer: "匯款",
-  cash_on_delivery: "可取付",
-  other: "其他",
+  cash_on_delivery: "取貨付款",
 };
 
 const UNAVAILABLE_REASON_LABELS = {

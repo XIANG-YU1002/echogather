@@ -1358,7 +1358,7 @@ Query：
 |---|---|
 | sort | `newest`、`price_asc`、`price_desc`、`deadline_asc`、`deadline_desc` |
 | available_only | 是否只顯示目前可跟團 |
-| cash_on_delivery_only | 是否只顯示可取貨付款／貨到付款 |
+| payment_method | 依付款方式篩選：`bank_transfer`、`cash_on_delivery`；未帶則不篩選 |
 | requires_second_payment | 是否需要二補 |
 | includes_full_gift | 是否包含滿贈 |
 | page | 頁碼 |
@@ -1437,8 +1437,8 @@ Response 包含活動、團主、付款方式、團規、主要聯絡方式、�
       "id": "uuid",
       "display_name": "月影團"
     },
-    "payment_method": "other",
-    "payment_method_note": "LINE Pay",
+    "payment_method": "bank_transfer",
+    "payment_method_note": "團費確認後再私訊告知匯款帳號",
     "requires_second_payment": false,
     "includes_full_gift": true,
     "deadline_at": "2026-08-10T15:00:00Z",
@@ -2014,7 +2014,16 @@ ORDER_CREATION_CONFLICT
 GET /api/v1/orders
 ```
 
-Query：`status`、`page`、`page_size`。
+Query：
+
+| Parameter | Description |
+|---|---|
+| status | 訂單狀態；未帶則不篩選 |
+| activity_name | 活動名稱快照的部分比對（不分大小寫），最長 150 字 |
+| group_leader_name | 團主名稱快照的部分比對（不分大小寫），最長 50 字 |
+| created_within_days | 只顯示近 N 天內建立的訂單，1～365；未帶則不限時間 |
+| page | 頁碼 |
+| page_size | 每頁數量 |
 
 預設 `created_at DESC`。
 
@@ -2026,15 +2035,20 @@ Response Item：
   "order_number": "WG-20260801-A1B2C3",
   "group_leader_name": "月影團",
   "activity_name": "3.4 官方周邊",
-  "representative_image_url": "/uploads/product/product.webp",
+  "representative_image_url": "https://<project-ref>.supabase.co/storage/v1/object/public/media/product/2026/08/product.webp",
   "item_summary": "壓克力立牌等 2 項",
+  "item_count": 2,
   "product_total_amount": "1170.00",
   "status": "pending_confirmation",
+  "rejection_reason": null,
   "created_at": "2026-08-01T03:00:00Z"
 }
 ```
 
 代表圖片使用第一筆訂單明細圖片。
+
+`item_count` 為訂單明細筆數（圖 07 的「N 項商品」）。
+`rejection_reason` 僅在 `status = rejected` 時有值，供列表顯示「查看原因」入口。
 
 ---
 
@@ -2066,8 +2080,8 @@ Response 包含：
     "product_total_amount": "1170.00",
     "group_leader_name": "月影團",
     "activity_name": "3.4 官方周邊",
-    "payment_method": "other",
-    "payment_method_note": "LINE Pay",
+    "payment_method": "bank_transfer",
+    "payment_method_note": "團費確認後再私訊告知匯款帳號",
     "requires_second_payment": false,
     "includes_full_gift": true,
     "rules": "下單時完整團規",
@@ -2435,8 +2449,8 @@ Request：
       "max_quantity": 20
     }
   ],
-  "payment_method": "other",
-  "payment_method_note": "LINE Pay",
+  "payment_method": "bank_transfer",
+  "payment_method_note": "團費確認後再私訊告知匯款帳號",
   "requires_second_payment": false,
   "includes_full_gift": true,
   "deadline_at": "2026-08-10T15:00:00Z",
@@ -2455,8 +2469,9 @@ Validation：
 - 截止時間晚於現在
 - 滿贈設定符合活動
 - 商品售價固定以 TWD
-- `payment_method = other` 時必須提供 `payment_method_note`
-- 其他付款方式以外不得提供 `payment_method_note`
+- `payment_method` 僅接受 `bank_transfer` 或 `cash_on_delivery`
+- `payment_method_note` 為選填，任何付款方式皆可填寫；空白字串一律正規化為 `null`
+- 同一團主對同一活動已有進行中的開團時，回 409 `GROUP_BUY_ALREADY_OPEN_FOR_ACTIVITY`
 
 任一步失敗不得建立部分開團商品。
 
@@ -3864,7 +3879,7 @@ DELETE /admin/announcements/{announcement_id}
 16. 活動可由管理員結束及重新開啟。
 17. 開團提前結單後不可重新開啟。
 18. 商品頁開團預設按建立時間新到舊排序。
-19. 開團比較支援價格升降序、截止時間近遠排序及可跟團、可取付、二補、滿贈篩選。
+19. 開團比較支援價格升降序、截止時間近遠排序及可跟團、付款方式、二補、滿贈篩選。
 20. 公開頁顯示查詢當下剩餘數量，但不代表保留。
 21. 搜尋活動、商品、角色分開計數及分頁。
 22. 跟團清單同一商品再次加入時增加數量；不同開團替換使用單一 Transaction。

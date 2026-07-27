@@ -9,9 +9,8 @@ import PageLoader from "../../components/common/PageLoader.jsx";
 import StatusBadge from "../../components/common/StatusBadge.jsx";
 
 const PAYMENT_METHOD_LABELS = {
-  bank_transfer: "銀行匯款",
-  cash_on_delivery: "貨到付款／取貨付款",
-  other: "其他",
+  bank_transfer: "匯款",
+  cash_on_delivery: "取貨付款",
 };
 const CONTACT_PLATFORM_LABELS = { facebook: "Facebook", discord: "Discord", line: "LINE" };
 const CANCELLABLE_STATUSES = ["pending_confirmation", "pending_payment", "paid"];

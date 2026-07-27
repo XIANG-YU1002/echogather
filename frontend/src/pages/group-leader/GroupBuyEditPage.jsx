@@ -20,9 +20,8 @@ import PageLoader from "../../components/common/PageLoader.jsx";
 import StatusBadge from "../../components/common/StatusBadge.jsx";
 
 const PAYMENT_METHODS = [
-  { value: "bank_transfer", label: "銀行匯款" },
-  { value: "cash_on_delivery", label: "貨到付款／取貨付款" },
-  { value: "other", label: "其他" },
+  { value: "bank_transfer", label: "匯款" },
+  { value: "cash_on_delivery", label: "取貨付款" },
 ];
 const CONTACT_PLATFORMS = [
   { value: "facebook", label: "Facebook" },
@@ -106,6 +105,9 @@ export default function GroupBuyEditPage() {
         if (field === "max_quantity") continue;
         if (field === "deadline_at") {
           payload.deadline_at = new Date(settings.deadline_at).toISOString();
+        } else if (field === "payment_method_note") {
+          // 選填欄位：留白代表清除備註
+          payload.payment_method_note = settings.payment_method_note.trim() || null;
         } else {
           payload[field] = settings[field];
         }
@@ -322,11 +324,7 @@ export default function GroupBuyEditPage() {
               value={settings.payment_method}
               disabled={!isEditable("payment_method")}
               onChange={(event) =>
-                setSettings((prev) => ({
-                  ...prev,
-                  payment_method: event.target.value,
-                  payment_method_note: event.target.value === "other" ? prev.payment_method_note : "",
-                }))
+                setSettings((prev) => ({ ...prev, payment_method: event.target.value }))
               }
             >
               {PAYMENT_METHODS.map((option) => (
@@ -337,19 +335,21 @@ export default function GroupBuyEditPage() {
             </select>
           </FormField>
 
-          {settings.payment_method === "other" && (
-            <FormField label="付款方式說明" htmlFor="edit-payment-method-note" required>
-              <input
-                id="edit-payment-method-note"
-                value={settings.payment_method_note}
-                disabled={!isEditable("payment_method_note")}
-                onChange={(event) =>
-                  setSettings((prev) => ({ ...prev, payment_method_note: event.target.value }))
-                }
-                required
-              />
-            </FormField>
-          )}
+          <FormField
+            label="付款方式備註（選填）"
+            htmlFor="edit-payment-method-note"
+            helperText="可補充付款細節，例如：團費確認後再私訊告知匯款帳號、取貨地點與時間、可接受的分期方式等。不填則不會顯示。"
+          >
+            <input
+              id="edit-payment-method-note"
+              value={settings.payment_method_note}
+              disabled={!isEditable("payment_method_note")}
+              placeholder="例如：團費確認後再私訊告知匯款帳號"
+              onChange={(event) =>
+                setSettings((prev) => ({ ...prev, payment_method_note: event.target.value }))
+              }
+            />
+          </FormField>
 
           <FormField label="是否二補" htmlFor="edit-second-payment">
             <select

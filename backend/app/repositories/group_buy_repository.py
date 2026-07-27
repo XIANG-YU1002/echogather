@@ -50,7 +50,7 @@ def list_group_buy_products_for_product(
     db: Session,
     product_id: uuid.UUID,
     *,
-    cash_on_delivery_only: bool,
+    payment_method: PaymentMethod | None,
     requires_second_payment: bool | None,
     includes_full_gift: bool | None,
 ) -> list[tuple[GroupBuyProduct, GroupBuy, Activity, GroupLeaderProfile]]:
@@ -62,14 +62,26 @@ def list_group_buy_products_for_product(
         .join(GroupLeaderProfile, GroupLeaderProfile.id == GroupBuy.group_leader_profile_id)
         .where(GroupBuyProduct.product_id == product_id)
     )
-    if cash_on_delivery_only:
-        stmt = stmt.where(GroupBuy.payment_method == PaymentMethod.CASH_ON_DELIVERY)
+    if payment_method is not None:
+        stmt = stmt.where(GroupBuy.payment_method == payment_method)
     if requires_second_payment is not None:
         stmt = stmt.where(GroupBuy.requires_second_payment.is_(requires_second_payment))
     if includes_full_gift is not None:
         stmt = stmt.where(GroupBuy.includes_full_gift.is_(includes_full_gift))
 
     return [(row[0], row[1], row[2], row[3]) for row in db.execute(stmt).all()]
+
+
+def get_open_group_buy_for_activity(
+    db: Session, group_leader_profile_id: uuid.UUID, activity_id: uuid.UUID
+) -> GroupBuy | None:
+    """取得該團主對該活動目前進行中的開團（同時只允許一個）。"""
+    stmt = select(GroupBuy).where(
+        GroupBuy.group_leader_profile_id == group_leader_profile_id,
+        GroupBuy.activity_id == activity_id,
+        GroupBuy.status == GroupBuyStatus.OPEN,
+    )
+    return db.execute(stmt).scalars().first()
 
 
 def list_by_group_leader(

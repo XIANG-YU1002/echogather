@@ -341,7 +341,7 @@ group_buy.status = closed
 - 開團所屬團主
 - 商品所屬活動
 - 活動是否支援滿贈
-- `other` 付款方式是否提供說明
+- 同一團主對同一活動是否已有進行中的開團
 - 開團是否已有正式訂單
 - 開團商品集合與價格是否仍可修改
 - 商品數量上限是否低於目前占用數量
@@ -582,11 +582,13 @@ other
 
 | Value | Description |
 |---|---|
-| bank_transfer | 銀行匯款 |
-| cash_on_delivery | 貨到付款或取貨付款 |
-| other | 其他付款方式，需另外填寫說明 |
+| bank_transfer | 匯款 |
+| cash_on_delivery | 取貨付款 |
 
 一筆開團只能使用一種付款方式。
+
+> 變更紀錄（2026-07-27，migration `0004_payment_and_group_buy_rules`）：
+> 依使用者決議移除 `other` 值，僅保留上述兩種。
 
 ---
 
@@ -1382,7 +1384,7 @@ group_buy
 | group_leader_profile_id | UUID | No | — | 建立開團的團主 |
 | activity_id | UUID | No | — | 所屬活動 |
 | payment_method | PaymentMethod | No | — | 付款方式 |
-| payment_method_note | TEXT | Yes | NULL | 選擇 `other` 時的付款方式說明 |
+| payment_method_note | TEXT | Yes | NULL | 付款方式備註（選填，任何付款方式皆可填寫） |
 | requires_second_payment | BOOLEAN | No | false | 是否需要二補 |
 | includes_full_gift | BOOLEAN | No | false | 是否包含滿贈 |
 | deadline_at | TIMESTAMPTZ | No | — | 收單截止時間 |
@@ -1416,17 +1418,14 @@ CHECK (LENGTH(TRIM(rules)) > 0)
 CHECK (LENGTH(TRIM(contact_value)) > 0)
 
 CHECK (
-    (
-        payment_method = 'other'
-        AND payment_method_note IS NOT NULL
-        AND LENGTH(TRIM(payment_method_note)) > 0
-    )
-    OR
-    (
-        payment_method <> 'other'
-        AND payment_method_note IS NULL
-    )
+    payment_method_note IS NULL
+    OR LENGTH(TRIM(payment_method_note)) > 0
 )
+
+-- 同一團主對同一活動同時只能有一個進行中的開團；結單後可再開新的一輪。
+CREATE UNIQUE INDEX uq_group_buy_leader_activity_open
+    ON group_buy (group_leader_profile_id, activity_id)
+    WHERE status = 'open';
 ```
 
 ---
@@ -1867,7 +1866,7 @@ group_order
 | group_leader_name_snapshot | VARCHAR(50) | No | — | 下單時團主名稱 |
 | activity_name_snapshot | VARCHAR(150) | No | — | 下單時活動名稱 |
 | payment_method_snapshot | PaymentMethod | No | — | 下單時付款方式 |
-| payment_method_note_snapshot | TEXT | Yes | NULL | 下單時其他付款方式說明 |
+| payment_method_note_snapshot | TEXT | Yes | NULL | 下單時付款方式備註（選填） |
 | requires_second_payment_snapshot | BOOLEAN | No | false | 下單時二補設定 |
 | includes_full_gift_snapshot | BOOLEAN | No | false | 下單時滿贈設定 |
 | rules_snapshot | TEXT | No | — | 下單時完整團規 |
@@ -1924,16 +1923,8 @@ CHECK (
 
 ```sql
 CHECK (
-    (
-        payment_method_snapshot = 'other'
-        AND payment_method_note_snapshot IS NOT NULL
-        AND LENGTH(TRIM(payment_method_note_snapshot)) > 0
-    )
-    OR
-    (
-        payment_method_snapshot <> 'other'
-        AND payment_method_note_snapshot IS NULL
-    )
+    payment_method_note_snapshot IS NULL
+    OR LENGTH(TRIM(payment_method_note_snapshot)) > 0
 )
 ```
 
@@ -3595,14 +3586,26 @@ WHERE announcement_id IS NOT NULL
 
 ---
 
-## 10.14 Other Payment Method
+## 10.14 Payment Method Note
 
 ```text
-payment_method = other
-→ payment_method_note 必填
+payment_method_note 為選填
+→ 任何付款方式皆可填寫（例如：團費確認後再私訊告知匯款帳號）
+→ 有值時不可為空白字串，未填一律存 NULL
 ```
 
-其他付款方式同樣保存於訂單快照。
+付款方式備註同樣保存於訂單快照。
+
+## 10.14b One Open Group Buy Per Leader And Activity
+
+```text
+同一 group_leader_profile_id + activity_id
+→ 同時只能有一筆 status = 'open' 的 group_buy
+→ 結單（status = 'closed'）後可再建立新的一輪
+```
+
+以 partial unique index `uq_group_buy_leader_activity_open` 於資料庫層強制，
+Service 層另有前置檢查以回傳 `GROUP_BUY_ALREADY_OPEN_FOR_ACTIVITY` 友善錯誤。
 
 ---
 

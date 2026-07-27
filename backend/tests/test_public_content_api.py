@@ -114,7 +114,7 @@ def test_product_group_buys_occupied_quantity_reduces_availability(client, db_se
     assert filtered.json()["data"] == []
 
 
-def test_product_group_buys_cash_on_delivery_filter(client, db_session):
+def test_product_group_buys_payment_method_filter(client, db_session):
     from app.models.enums import PaymentMethod
 
     activity = create_activity(db_session)
@@ -128,10 +128,16 @@ def test_product_group_buys_cash_on_delivery_filter(client, db_session):
     )
     create_group_buy_product(db_session, group_buy, product)
 
-    response = client.get(
-        f"/api/v1/products/{product.id}/group-buys", params={"cash_on_delivery_only": True}
-    )
-    assert response.json()["data"] == []
+    url = f"/api/v1/products/{product.id}/group-buys"
+
+    # 未指定付款方式時不篩選
+    assert len(client.get(url).json()["data"]) == 1
+    # 指定為該開團的付款方式時保留
+    assert len(client.get(url, params={"payment_method": "bank_transfer"}).json()["data"]) == 1
+    # 指定為其他付款方式時濾除
+    assert client.get(url, params={"payment_method": "cash_on_delivery"}).json()["data"] == []
+    # 不合法的付款方式回 422
+    assert client.get(url, params={"payment_method": "bogus"}).status_code == 422
 
 
 def test_get_group_buy_detail(client, db_session):

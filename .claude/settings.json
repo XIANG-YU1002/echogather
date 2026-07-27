@@ -1,0 +1,33 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(./venv/Scripts/python.exe -m pytest*)",
+      "PowerShell(Set-Location backend; ./venv/Scripts/python.exe -m pytest*)",
+      "Bash(backend/venv/Scripts/python.exe -m pytest*)",
+      "Bash(cd backend && venv/Scripts/python.exe -m pytest*)",
+
+      "PowerShell(./venv/Scripts/python.exe -m uvicorn*)",
+      "PowerShell(Set-Location backend; ./venv/Scripts/python.exe -m uvicorn*)",
+
+      "PowerShell(./venv/Scripts/python.exe -m alembic*)",
+      "PowerShell(Set-Location backend; ./venv/Scripts/python.exe -m alembic*)",
+
+      "PowerShell(./venv/Scripts/python.exe -m pip list*)",
+      "PowerShell(./venv/Scripts/python.exe -m pip freeze*)",
+
+      "PowerShell(& \"C:\\Program Files\\nodejs\\npm.cmd\" run dev*)",
+      "PowerShell(& \"C:\\Program Files\\nodejs\\npm.cmd\" run build*)",
+      "PowerShell(& \"C:\\Program Files\\nodejs\\npm.cmd\" install*)",
+
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git show*)",
+      "Bash(git branch*)",
+
+      "Read",
+      "Glob",
+      "Grep"
+    ]
+  }
+}

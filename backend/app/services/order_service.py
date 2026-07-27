@@ -162,9 +162,26 @@ def _build_item_summary(items) -> str:
 
 
 def get_my_orders(
-    db: Session, user_id: uuid.UUID, status: OrderStatus | None, page: int, page_size: int
+    db: Session,
+    user_id: uuid.UUID,
+    status: OrderStatus | None,
+    page: int,
+    page_size: int,
+    *,
+    activity_name: str | None = None,
+    group_leader_name: str | None = None,
+    created_within_days: int | None = None,
 ) -> tuple[list[OrderListItem], int]:
-    orders, total = order_repository.list_by_user(db, user_id, status, page, page_size)
+    orders, total = order_repository.list_by_user(
+        db,
+        user_id,
+        status,
+        page,
+        page_size,
+        activity_name=activity_name,
+        group_leader_name=group_leader_name,
+        created_within_days=created_within_days,
+    )
     results = []
     for order in orders:
         items = order_repository.get_items(db, order.id)
@@ -176,8 +193,10 @@ def get_my_orders(
                 activity_name=order.activity_name_snapshot,
                 representative_image_url=items[0].image_url_snapshot if items else "",
                 item_summary=_build_item_summary(items) if items else "",
+                item_count=len(items),
                 product_total_amount=order.product_total_amount,
                 status=order.status,
+                rejection_reason=order.rejection_reason,
                 created_at=order.created_at,
             )
         )

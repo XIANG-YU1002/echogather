@@ -6,6 +6,7 @@ from sqlalchemy import (
     DateTime,
     Enum,
     ForeignKey,
+    Index,
     Integer,
     Numeric,
     Text,
@@ -73,20 +74,11 @@ class GroupBuy(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         CheckConstraint(
             "length(trim(contact_value)) > 0", name="ck_group_buy_contact_value_not_blank"
         ),
+        # payment_method_note 為任意付款方式皆可填的選填備註；
+        # 若有填寫則不得為空白字串（未填請存 NULL）。
         CheckConstraint(
-            """
-            (
-                payment_method = 'other'
-                AND payment_method_note IS NOT NULL
-                AND length(trim(payment_method_note)) > 0
-            )
-            OR
-            (
-                payment_method <> 'other'
-                AND payment_method_note IS NULL
-            )
-            """,
-            name="ck_group_buy_payment_method_note_pair",
+            "payment_method_note IS NULL OR length(trim(payment_method_note)) > 0",
+            name="ck_group_buy_payment_method_note_not_blank",
         ),
         CheckConstraint(
             """
@@ -95,6 +87,14 @@ class GroupBuy(UUIDPrimaryKeyMixin, TimestampMixin, Base):
             (status = 'closed' AND closed_at IS NOT NULL)
             """,
             name="ck_group_buy_status_closed_at_pair",
+        ),
+        # 同一團主對同一活動同時只能有一個進行中的開團；結單後可再開新的一輪。
+        Index(
+            "uq_group_buy_leader_activity_open",
+            "group_leader_profile_id",
+            "activity_id",
+            unique=True,
+            postgresql_where=text("status = 'open'"),
         ),
     )
 

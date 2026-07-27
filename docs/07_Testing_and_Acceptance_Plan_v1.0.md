@@ -369,7 +369,7 @@
 | GB-002 | P1 | 建立前先選 open activity | open 與 ended activity | 分別選擇建立 | open 成功；ended 回 ACTIVITY_NOT_OPEN | BR 15.2 | Not Run |
 | GB-003 | P1 | 至少一項且只能選該活動 active 商品 | 多活動、active/inactive products | 提交空 products、跨活動、inactive、重複商品 | 各自 422／409；不建立部分開團 | BR 15.3 | Not Run |
 | GB-004 | P1 | 付款方式銀行匯款 | L-02 | payment_method=bank_transfer | 建立成功；不要求 payment_method_note | BR 15.5 | Not Run |
-| GB-005 | P1 | 可取付付款方式 | L-02 | payment_method=cash_on_delivery | 建立成功；商品頁可用「可取付」篩選找到 | BR 15.5；17.3 | Not Run |
+| GB-005 | P1 | 取貨付款付款方式 | L-02 | payment_method=cash_on_delivery | 建立成功；商品頁可用「付款方式＝取貨付款」篩選找到 | BR 15.5；17.3 | Not Run |
 | GB-006 | P1 | 其他付款方式必填說明 | L-02 | payment_method=other，分別不傳與傳入說明 | 無說明 422；有說明成功並公開顯示 | BR 15.5 | Not Run |
 | GB-007 | P1 | 二補、滿贈與期限驗證 | open activity | 提交期限已過、滿贈不符合活動、有效組合 | 無效拒絕；有效建立 | BR 15.6～15.8 | Not Run |
 | GB-008 | P1 | 團規與主要聯絡不可空 | L-02 | 團規或 contact_value 空白 | 422；不建立開團 | BR 15.9 | Not Run |
@@ -381,7 +381,7 @@
 | GB-014 | P1 | effective status 優先原因 | 組合 expired、activity ended、full、closed | 查 detail 與列表 | effective_status 與 is_available 按規則一致；不保存錯誤衍生值 | BR 16.7～16.8 | Not Run |
 | GB-015 | P1 | 預設開團新到舊 | 同商品多開團 | GET products/{id}/group-buys 無 sort | created_at DESC | BR 17.1 | Not Run |
 | GB-016 | P2 | 價格與截止時間排序 | 多筆不同價格／期限 | 依 price_asc、price_desc、deadline_asc、deadline_desc 查詢 | 順序完全正確；相同值有穩定次排序 | BR 17.2 | Not Run |
-| GB-017 | P2 | 開團篩選組合 | 資料涵蓋 available、可取付、二補、滿贈 | 單項與多項組合篩選 | 只回同時符合條件資料；清除篩選恢復完整列表 | BR 17.3～17.4 | Not Run |
+| GB-017 | P2 | 開團篩選組合 | 資料涵蓋 available、付款方式、二補、滿贈 | 單項與多項組合篩選 | 只回同時符合條件資料；清除篩選恢復完整列表 | BR 17.3～17.4 | Not Run |
 | GB-018 | P1 | 公開剩餘量不代表保留 | remaining=1；兩會員同時查看 | 兩人皆看到 1，先後送單 | 顯示可相同；只有先完成 Transaction 者成功，另一人數量不足 | BR 17.5；18.6；20.7 | Not Run |
 
 ---
@@ -537,7 +537,7 @@
 | UI-006 | P1 | API 驗證錯誤映射到欄位 | 表單無效資料 | 觸發 VALIDATION_ERROR fields | 對應欄位顯示訊息；其他輸入保留 | API Error；UI forms | Not Run |
 | UI-007 | P1 | 下單確認為完整頁面區段 | 有效清單 | 進下單確認頁 | 清楚顯示商品、商品總額、團規與勾選；不是小型 Modal | User Flow Decision 7 | Not Run |
 | UI-008 | P1 | 下單失敗保留畫面與清單 | 造成數量不足 | 提交訂單 | 顯示最新原因；清單與數量仍可編輯；不跳到成功頁 | BR 19.5 | Not Run |
-| UI-009 | P2 | 開團排序與篩選控制 | 多筆開團 | 切換所有排序與可跟團／可取付／二補／滿贈篩選 | URL／狀態與結果一致；可清除；預設新到舊 | BR 17 | Not Run |
+| UI-009 | P2 | 開團排序與篩選控制 | 多筆開團 | 切換所有排序與可跟團／付款方式／二補／滿贈篩選 | URL／狀態與結果一致；可清除；預設新到舊 | BR 17 | Not Run |
 | UI-010 | P2 | 通知點擊導向與已讀 | 未讀通知 | 點擊通知 | 標記已讀並進相關頁；若來源公告已刪除，顯示可理解狀態 | BR 26.5 | Not Run |
 | UI-011 | P2 | 基本鍵盤與可讀性 | 桌面瀏覽器 | Tab 操作表單、按鈕、Dialog／裁切器 | 焦點可見、順序合理、可用鍵盤完成主要操作；label 對應欄位 | General usability | Not Run |
 | UI-012 | P3 | 無 Footer 與簡化 Hero 一致 | 公開頁 | 檢查首頁與各頁底部 | 無 Footer；Hero 非輪播；不出現未規格功能入口 | UI Decisions | Not Run |

@@ -94,6 +94,14 @@ def create_group_buy(
     if activity.status != ActivityStatus.OPEN:
         raise AppError(409, "ACTIVITY_NOT_OPEN", "活動目前不是進行中，無法建立開團。")
 
+    # 同一團主對同一活動同時只能有一個進行中的開團（DB 亦有 partial unique index 把關）。
+    if group_buy_repository.get_open_group_buy_for_activity(db, profile.id, activity.id):
+        raise AppError(
+            409,
+            "GROUP_BUY_ALREADY_OPEN_FOR_ACTIVITY",
+            "你對這個活動已經有一個進行中的開團，請先結單後再建立新的開團。",
+        )
+
     deadline_at = _ensure_utc(payload.deadline_at)
     if deadline_at <= datetime.now(timezone.utc):
         raise AppError(
@@ -278,10 +286,9 @@ def update_group_buy_settings(
             new_note = (
                 payload.payment_method_note if "payment_method_note" in provided else group_buy.payment_method_note
             )
-            if new_method == PaymentMethod.OTHER and not new_note:
-                raise AppError(422, "PAYMENT_METHOD_NOTE_REQUIRED", "選擇其他付款方式時必須填寫說明。")
-            if new_method != PaymentMethod.OTHER and new_note is not None:
-                raise AppError(422, "PAYMENT_METHOD_NOTE_NOT_ALLOWED", "非其他付款方式不可填寫付款方式說明。")
+            # 付款方式備註為選填，空白字串一律存成 NULL。
+            if new_note is not None:
+                new_note = new_note.strip() or None
             group_buy.payment_method = new_method
             group_buy.payment_method_note = new_note
 

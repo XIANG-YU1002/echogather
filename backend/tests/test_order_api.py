@@ -105,6 +105,9 @@ def test_get_my_orders_list_and_detail(client, db_session):
     assert len(items) == 1
     assert items[0]["id"] == order_id
     assert items[0]["product_total_amount"] == "450.00"
+    # 依圖 07：列表需提供商品項目數與拒絕原因
+    assert items[0]["item_count"] == 1
+    assert items[0]["rejection_reason"] is None
 
     detail_response = client.get(f"/api/v1/orders/{order_id}", headers=headers)
     assert detail_response.status_code == 200
@@ -114,6 +117,45 @@ def test_get_my_orders_list_and_detail(client, db_session):
     assert detail["items"][0]["quantity"] == 3
     assert detail["cancellation_requests"] == []
     assert detail["pending_cancellation_request"] is None
+
+
+def test_get_my_orders_filters(client, db_session):
+    """依圖 07 篩選卡：活動名稱、團主名稱（不分大小寫部分比對）與時間範圍。"""
+    activity = create_activity(db_session)
+    product = create_product(db_session, activity=activity)
+    leader_profile = create_group_leader_profile(db_session)
+    group_buy = create_group_buy(
+        db_session, group_leader_profile=leader_profile, activity=activity
+    )
+    group_buy_product = create_group_buy_product(db_session, group_buy, product, max_quantity=5)
+
+    _, token = register_and_login(client)
+    headers = auth_headers(token)
+    _add_follow_list_item(client, headers, group_buy_product.id, 1)
+    client.post("/api/v1/orders", json={"rules_accepted": True}, headers=headers)
+
+    activity_name = activity.name
+    leader_name = leader_profile.display_name
+
+    def count(params):
+        response = client.get("/api/v1/orders", params=params, headers=headers)
+        assert response.status_code == 200, response.text
+        return len(response.json()["data"])
+
+    # 不帶條件時看得到
+    assert count({}) == 1
+    # 活動名稱部分比對命中／不命中
+    assert count({"activity_name": activity_name[:4]}) == 1
+    assert count({"activity_name": "絕對不存在的活動"}) == 0
+    # 團主名稱部分比對命中／不命中
+    assert count({"group_leader_name": leader_name[:3]}) == 1
+    assert count({"group_leader_name": "絕對不存在的團主"}) == 0
+    # 時間範圍：剛建立的訂單落在近 7 天內
+    assert count({"created_within_days": 7}) == 1
+    # 超出允許範圍的天數回 422
+    assert client.get(
+        "/api/v1/orders", params={"created_within_days": 0}, headers=headers
+    ).status_code == 422
 
 
 def test_order_detail_not_visible_to_other_member(client, db_session):

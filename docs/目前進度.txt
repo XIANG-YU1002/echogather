@@ -772,8 +772,8 @@ frontend/src/pages/admin/AnnouncementListPage.jsx 改為 35_ 版面：左側公�
 ✅ 圖 05 購物車（原跟團清單）FollowListPage
 ✅ 跨頁：可選款式/角色功能（分角色庫存，前後端＋migration 0003＋seed）
 ✅ 跨頁：跟團清單→購物車 命名調整＋Header 購物車圖示與紅點數量
-⬜ 圖 06 訂單確認頁 OrderConfirmPage
-⬜ 圖 07 會員訂單列表頁 OrdersPage
+✅ 圖 06 訂單確認頁 OrderConfirmPage（2026-07-27 完成，已經使用者瀏覽器實測確認）
+✅ 圖 07 會員訂單列表頁 OrdersPage（2026-07-27 完成，待使用者實測確認）
 ⬜ 圖 08 會員訂單詳情頁 OrderDetailPage（含所選角色顯示）
 ⬜ 圖 09 取消訂單申請頁 CancellationRequestPage
 ⬜ 圖 10 通知中心頁 NotificationsPage
@@ -795,3 +795,193 @@ frontend/src/pages/admin/AnnouncementListPage.jsx 改為 35_ 版面：左側公�
 ⬜ 圖 27 團主資料管理頁 group-leader/ProfilePage
 
 備註：管理員後台（圖 28–35）非本次前台改版範圍（先前批次已處理）。
+
+
+================================================================================
+第 3 批前台改版：圖 06 訂單確認頁 ＋ 付款方式與開團規則調整
+================================================================================
+記錄時間：2026-07-27
+
+--- 0. 環境重建（換機／重新 clone 後必做）---
+- backend/.env、frontend/.env、backend/venv、frontend/node_modules 皆為 .gitignore
+  排除項，需重建。Python 3.12.10 位於 %LOCALAPPDATA%\Programs\Python\Python312，
+  Node v24.18.0 位於 C:\Program Files\nodejs，兩者皆不在系統 PATH，需用完整路徑。
+- 注意：.env 必須存成「無 BOM」的 UTF-8，否則 pydantic-settings 會把第一個鍵
+  讀成 "\ufeffdatabase_url" 而報 extra_forbidden。
+- 新增 .claude/settings.json（權限允許清單），讓 pytest／uvicorn／npm 等指令
+  不必每次確認。新建此資料夾後需重啟 Claude Code 才會載入。
+
+--- 1. 圖片儲存改為純 Supabase Storage（清掉本機 uploads 殘留）---
+- upload_service 早已改上傳 Supabase Storage，但 main.py 仍 mount /uploads 靜態目錄、
+  config 仍有 upload_directory，屬無用殘留且是 404 來源。本次全部移除：
+  .gitignore 的 backend/uploads/、main.py 的 mkdir 與 StaticFiles mount、
+  config.py 的 upload_directory、.env 與 .env.example 的 UPLOAD_DIRECTORY。
+- .env.example 補上 SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY / SUPABASE_STORAGE_BUCKET。
+- 舊資料修復（一次性）：DB 內 6 筆指向 /uploads/... 的圖片網址已處理 —
+  測試資料（測試3、測試5、測試活動2，皆無下游引用）整筆刪除；
+  示範資料（3.4 官方周邊、今汐壓克力立牌、索拉里斯記行系列粒包包）改指向
+  上傳至 Supabase Storage 的佔位圖 media/_placeholder/no-image.webp。
+  修復後全表 /uploads 殘留 0 筆。
+
+--- 2. 圖 06 訂單確認頁 OrderConfirmPage 改版（依參考圖）---
+- 新增麵包屑「首頁 / 購物車 / 確認訂單」、無圖示徽章的標題區。
+- 版面改為 A 全寬 → B 與 C 左右並排（two-col-section）→ D 全寬 ＋ 右側訂單摘要卡。
+- A 商品確認：表格加「款式 / 角色」欄、商品欄加縮圖與活動標籤、小計紫色粗體、
+  金額格式改 NT$390（無空格）、底部改灰底 info 條。
+- B 開團資訊：左標籤右值列表，是否二補／是否包含滿贈改「是／否」，
+  收單期限改 2026/07/20 23:59 格式，「查看團主頁面」改整寬按鈕帶圖示。
+- C 會員聯絡資料：三個平台固定列出並配品牌圓形圖示（FB/Discord/LINE），
+  未填寫顯示灰字「未填寫」；三個全空時另跳紅色 Alert；修改連結置中帶鉛筆圖示。
+- D 團規確認：滾動框（自訂捲軸）＋紫色勾選框。
+- 右側摘要卡：ClipboardIcon 標題、大字紫色總額、紫底 info 區塊、
+  「← 返回購物車」次要鈕、「送出訂單」主要鈕帶圖示。
+- 新增圖示：PencilIcon、ArrowLeftIcon、FacebookIcon、DiscordIcon、LineIcon
+  （品牌圖示用各自品牌色圓底，不使用 currentColor）。
+- 新增 CSS：.oc-* 系列與 .section-title.plain（去掉左側紫色直條）。
+
+【使用者裁決紀錄（圖 06）】
+1. 術語衝突：參考圖寫「跟團清單」，但圖 01–05 改版已一律用「購物車」→ 決議維持「購物車」。
+2. 付款方式標籤：折衷採「匯款／取貨付款／其他」（後續其他被移除，見第 3 點）。
+3. 團規呈現：資料庫 rules 為純文字，決議原樣顯示不自動加編號，僅保留換行（pre-wrap）。
+4. 表格第二欄欄名：沿用圖 05 的「款式 / 角色」，不用參考圖的「規格 / 版本」。
+
+--- 3. 付款方式全面調整（跨頁）---
+- 「可取付」與「銀行匯款／貨到付款」等 3 種不一致寫法，全站 8 處統一為
+  匯款（bank_transfer）／取貨付款（cash_on_delivery）。
+- 移除 other 付款方式（使用者決議）：PaymentMethod enum、DB enum 型別、
+  前端所有選項與標籤、Schema/Service 驗證邏輯、相關測試全部移除。
+- payment_method_note 由「僅 other 必填、其餘強制 NULL」改為「任何付款方式皆可選填」，
+  空白一律正規化為 NULL。團主建立／編輯開團頁的備註欄改為常駐選填，
+  並依使用者要求加上 placeholder 與說明文字（範例：團費確認後再私訊告知匯款帳號）。
+- 商品詳情頁篩選：原「只顯示可取貨付款」勾選框 → 「付款方式」下拉
+  （不限／取貨付款／匯款，預設不限）。後端新增 payment_method query 參數
+  （PaymentMethod enum，無效值自動 422），並移除舊的 cash_on_delivery_only 參數。
+
+--- 4. 新增業務規則：一團主一活動只能有一個進行中的開團 ---
+- 使用者決議：只限 status='open'，結單後可再開新的一輪。
+- 資料庫層：partial unique index uq_group_buy_leader_activity_open
+  ON group_buy (group_leader_profile_id, activity_id) WHERE status = 'open'。
+- Service 層前置檢查回傳 409 GROUP_BUY_ALREADY_OPEN_FOR_ACTIVITY 友善訊息。
+- 限制只針對同一團主；不同團主對同一活動仍可各自開團（有反向測試涵蓋）。
+
+--- 5. Alembic migration 0004_payment_and_group_buy_rules ---
+- 刪除引用 'other' 的兩個成對 CHECK 約束（group_buy 與 group_order 快照）。
+- 重建 payment_method enum（PostgreSQL 無法直接移除 enum 值，故改名→新建→
+  ALTER COLUMN USING→DROP 舊型別），並先把殘留 'other' 資料轉為 bank_transfer。
+- 新增備註 not-blank 約束、新增上述 partial unique index。含完整 downgrade。
+- 已對 Supabase 執行成功並實查驗證：enum 只剩 2 值、無殘留舊型別、約束與索引皆正確。
+
+--- 6. 規格文件同步 ---
+- docs/04：PaymentMethod enum 表、payment_method_note 欄位說明與 CHECK、
+  訂單快照欄位與 CHECK、§10.14 改寫、新增 §10.14b 一團主一活動一團、新增唯一索引定義。
+- docs/05：group-buys 查詢參數 cash_on_delivery_only → payment_method、
+  建立開團驗證規則、範例 JSON 的 other → bank_transfer、第 19 條規則。
+- docs/06：§15.5 付款方式清單與備註規則、§17.3 篩選、§34.5 檢查清單、
+  總則第 28-1／29／30／35 條。
+- docs/07：GB-005、GB-017、UI-009 三筆測試案例。
+
+--- 7. 測試 ---
+- test_upload_api.py：斷言由本機 /uploads/ 路徑改為 Supabase Storage 公開網址格式，
+  並以 monkeypatch 攔截 upload_bytes，測試不再真的打外部 Storage。→ 7 passed。
+- test_public_content_api.py：cash_on_delivery 篩選測試改寫為 payment_method 篩選
+  （含未帶／相符／不符／無效值 422 四種情境）。→ 19 passed。
+- test_group_leader_group_buy_api.py：移除 other 必填說明測試，新增 4 個測試 —
+  other 被拒（422）、備註選填（含空白正規化）、重複開團被拒（409）、
+  不同團主同活動仍可開。→ 21 passed。
+
+【已知既有問題（非本次造成）】
+- test_public_content_api.py::test_global_search_preview 失敗：
+  測試建立角色「今汐」與 Supabase 上的示範資料撞名，違反 uq_character_name_lower。
+  這是「共用正式資料庫當測試庫」的副作用，待決定處理方式（改用隨機角色名或清資料）。
+
+--- 8. 前台改版逐頁進度更新 ---
+✅ 圖 06 訂單確認頁 OrderConfirmPage（本批完成，已經使用者瀏覽器實測確認）
+✅ 圖 07 會員訂單列表頁 OrdersPage（本批完成，詳見下方「第 3 批續」）
+
+【圖 07 曾待裁決的衝突（已於下方「第 3 批續」記錄使用者決議並完成）】
+1. 出貨單號：參考圖顯示「出貨單號：1234567890」，但 docs/06 §21.6 明文
+   「第一版不保存物流單號或物流商」，docs/04 §14 將 tracking_number 列為未來擴充。
+2. 付款倒數「剩餘 23:45:12」：規格中完全沒有付款期限概念（無欄位、無規則、
+   無逾期處理方式），屬全新功能。
+3. 時間範圍／活動名稱／團主名稱三個篩選：後端 GET /orders 目前只吃 status 與分頁。
+4. 「訂單相關說明」「常見問題」兩個頁面在 35 張參考圖與現有路由中都不存在。
+另註：圖 07 的 Header 與圖 06 不同（品牌標語與導覽項目皆異），
+依協作規則「Header 固定不動」，不予變更。
+
+
+--------------------------------------------------------------------------------
+第 3 批續：圖 07 會員訂單列表頁 OrdersPage
+--------------------------------------------------------------------------------
+記錄時間：2026-07-27
+
+【使用者裁決紀錄（圖 07）】
+1. 出貨單號：參考圖有「出貨單號：1234567890」，但 docs/06 §21.6 明文「第一版不保存
+   物流單號或物流商」、docs/04 §14 列為未來擴充 → 決議「不做，照規格」。
+2. 付款倒數「剩餘 23:45:12」：規格無付款期限概念（無欄位／無規則／無逾期處理）
+   → 決議「不做，照規格」。
+3. 右側篩選卡：決議「全部實作」。時間範圍選項採 全部時間／近 7 天／近 30 天／近 90 天。
+4. 右側「快速操作」卡（含不存在的「訂單相關說明」「常見問題」頁）→ 決議「整張卡不做」。
+5. 左側會員側邊導覽（MemberLayout：個人資料／我的訂單／收藏商品／通知中心／團主申請／
+   登出）→ 決議「保留」。參考圖未畫出，但它是 /profile、/orders、/favorites、
+   /notifications、/follow-list 共用的版面，拿掉會影響整個會員區。
+6. 訂單列表呈現 → 決議「改成參考圖的表格」（不沿用原本的一單一卡片）。
+
+【實際版面】
+[220px 會員側邊導覽] │ 麵包屑 + 標題徽章
+                     │ 底線式狀態頁籤
+                     │ [訂單表格卡]  [篩選卡 300px]
+篩選卡在 ≤1200px 時以 order:-1 移到表格上方，避免三欄擠壓表格。
+
+【後端變更】
+- OrderListItem 新增 item_count（訂單明細筆數，供「N 項商品」）與
+  rejection_reason（僅 rejected 有值，供「查看原因」入口）。
+- GET /api/v1/orders 新增三個 query 參數：
+  activity_name（活動名稱快照 ILIKE 部分比對，≤150 字）、
+  group_leader_name（團主名稱快照 ILIKE 部分比對，≤50 字）、
+  created_within_days（1～365，只顯示近 N 天訂單）。
+- order_repository.list_by_user 對應新增篩選條件。page_size 沿用既有分頁參數
+  （PaginationParams 已支援 1～100），前端提供 10／20／50 下拉。
+
+【前端變更】
+- OrdersPage 全面改寫：麵包屑、page-head 徽章標題、底線式頁籤（.ol-tabs）、
+  訂單表格（.ol-table，六欄：訂單資訊／活動·團主／商品總額／狀態／建立時間／操作）、
+  表格內縮圖 + 訂單編號 + 「N 項商品」、活動與團主分兩行、
+  已拒絕列顯示「查看原因」連結、時間格式改 2026/07/27 13:35、
+  分頁列加「每頁顯示 N 筆」下拉、右側篩選卡（狀態／時間範圍／活動名稱／團主名稱
+  ＋重設／套用；draft 與 applied 分離，輸入後按「套用篩選」才查詢）。
+- api/orders.js getMyOrders 支援 activityName／groupLeaderName／createdWithinDays。
+- 新增 CSS：.ol-* 系列。
+
+【測試】
+- test_order_api.py：既有列表測試補驗 item_count／rejection_reason；
+  新增 test_get_my_orders_filters（活動名稱命中/不命中、團主名稱命中/不命中、
+  近 7 天、非法天數 422）。→ test_order_api.py 全數通過。
+
+--------------------------------------------------------------------------------
+【完整 pytest 結果與失敗分類】（2026-07-27，168 個測試）
+--------------------------------------------------------------------------------
+結果：10 failed / 161 passed（15 分鐘）。本批改動造成的回歸：0 個。
+
+A 類｜環境問題：以正式 Supabase 當測試資料庫且庫內有 seed 示範資料（8 個）
+  - test_admin_character_api：test_create_character／
+    test_create_character_duplicate_case_insensitive／test_get_suggestions
+    （測試寫死角色名「今汐」，示範資料已存在 → uq_character_name_lower 衝突）
+  - test_admin_product_api：test_create_product_with_existing_and_new_character／
+    test_create_product_new_character_reuses_existing_case_insensitive（同上）
+  - test_public_content_api::test_global_search_preview（同上）
+  - test_admin_dashboard_api::test_dashboard_counts（assert 2 == 1，
+    示範資料本身已有 1 個進行中開團）
+  - test_admin_announcement_api::test_create_platform_announcement_notifies_all_members
+    （通知「所有會員」，示範資料的既有使用者讓數量對不上）
+  → 尚未處理。建議解法：測試改用隨機角色名／改為相對斷言（>= 而非 ==），
+    或另建獨立測試資料庫。待使用者決定。
+
+B 類｜上一批 migration 0003 改了 schema 但未同步的陳舊結構測試（2 個）→ 本次已修正
+  - test_all_18_tables_registered → 更名 test_all_tables_registered，
+    EXPECTED_TABLES 補上 group_buy_product_character，數量改 19。
+  - test_unique_constraints_exist_for_pending_style_business_rules →
+    約束名改為 uq_order_item_order_product_character。
+
+C 類｜本批造成的回歸（1 個）→ 已修正
+  - test_admin_dashboard_api::test_current_group_buys_list 原本用同一團主+同一活動
+    連開兩團，違反新的 uq_group_buy_leader_activity_open。已改為第二團使用另一個活動。

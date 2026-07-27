@@ -9,7 +9,6 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 480
     cors_allowed_origins: str = "http://localhost:5173"
-    upload_directory: str = "./uploads"
     max_upload_file_size_bytes: int = 10 * 1024 * 1024
 
     supabase_url: str = ""

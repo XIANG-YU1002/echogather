@@ -44,7 +44,9 @@ def test_current_group_buys_list(client, db_session):
     activity = create_activity(db_session)
     product = create_product(db_session, activity=activity)
     leader_profile = create_group_leader_profile(db_session)
-    create_group_buy(db_session, group_leader_profile=leader_profile, activity=activity)
+    # 同一團主對同一活動只能有一個進行中的開團，因此第二團改用另一個活動。
+    other_activity = create_activity(db_session)
+    create_group_buy(db_session, group_leader_profile=leader_profile, activity=other_activity)
     group_buy = create_group_buy(db_session, group_leader_profile=leader_profile, activity=activity)
     create_group_buy_product(db_session, group_buy, product)
 
