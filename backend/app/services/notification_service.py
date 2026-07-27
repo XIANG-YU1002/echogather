@@ -5,9 +5,17 @@ from sqlalchemy.orm import Session
 from app.core.errors import AppError
 from app.models.announcement import Announcement
 from app.models.enums import AnnouncementAudienceScope, AnnouncementType, NotificationType
+from app.models.group_leader import GroupLeaderProfile
 from app.models.notification import Notification
+from app.models.order import GroupOrder
+from app.models.user import AppUser
 from app.repositories import notification_repository
-from app.schemas.notification import NotificationItem, NotificationSource, UnreadCountResponse
+from app.schemas.notification import (
+    NotificationItem,
+    NotificationSource,
+    NotificationSummaryResponse,
+    UnreadCountResponse,
+)
 
 
 def notify_order_event(
@@ -65,10 +73,13 @@ def notify_announcement_recipients(
 def _source_and_target_url(db: Session, notification: Notification) -> tuple[NotificationSource, str | None]:
     """依 Business Rules §26.5：依通知來源決定導向頁面。"""
     if notification.order_id is not None:
-        return (
-            NotificationSource(type="order", id=str(notification.order_id)),
-            f"/orders/{notification.order_id}",
-        )
+        source = NotificationSource(type="order", id=str(notification.order_id))
+        # 同一筆訂單的通知可能寄給下單會員或該團團主，兩者的訂單頁不同。
+        # 收件人不是下單者時視為團主，導向團主端訂單詳情。
+        order = db.get(GroupOrder, notification.order_id)
+        if order is not None and order.user_id != notification.user_id:
+            return source, f"/group-leader/orders/{notification.order_id}"
+        return source, f"/orders/{notification.order_id}"
 
     if notification.announcement_id is not None:
         source = NotificationSource(type="announcement", id=str(notification.announcement_id))
@@ -95,8 +106,26 @@ def _source_and_target_url(db: Session, notification: Notification) -> tuple[Not
     return NotificationSource(type="unknown", id=None), None
 
 
+def _announcement_actor(db: Session, notification: Notification) -> tuple[str | None, str | None]:
+    """團主公告的發布者名稱與頭像（依圖 10 於通知列表顯示團主頭像）。
+
+    平台公告與系統通知沒有發布者頭像，回傳 (None, None)。
+    """
+    if notification.announcement_id is None:
+        return None, None
+    announcement = db.get(Announcement, notification.announcement_id)
+    if announcement is None or announcement.group_leader_profile_id is None:
+        return None, None
+    profile = db.get(GroupLeaderProfile, announcement.group_leader_profile_id)
+    if profile is None:
+        return None, None
+    user = db.get(AppUser, profile.user_id)
+    return profile.display_name, (user.avatar_url if user is not None else None)
+
+
 def _to_item(db: Session, notification: Notification) -> NotificationItem:
     source, target_url = _source_and_target_url(db, notification)
+    actor_name, actor_avatar_url = _announcement_actor(db, notification)
     return NotificationItem(
         id=notification.id,
         notification_type=notification.notification_type,
@@ -106,6 +135,8 @@ def _to_item(db: Session, notification: Notification) -> NotificationItem:
         read_at=notification.read_at,
         source=source,
         target_url=target_url,
+        actor_name=actor_name,
+        actor_avatar_url=actor_avatar_url,
         created_at=notification.created_at,
     )
 
@@ -132,6 +163,16 @@ def list_notifications(
 
 def get_unread_count(db: Session, user_id: uuid.UUID) -> UnreadCountResponse:
     return UnreadCountResponse(unread_count=notification_repository.get_unread_count(db, user_id))
+
+
+def get_summary(db: Session, user_id: uuid.UUID) -> NotificationSummaryResponse:
+    """圖 10 右側「通知摘要」：未讀總數，加上各類型的總筆數（含已讀）。"""
+    counts = notification_repository.count_by_type(db, user_id)
+    return NotificationSummaryResponse(
+        unread_count=notification_repository.get_unread_count(db, user_id),
+        system_count=counts.get(NotificationType.SYSTEM.value, 0),
+        group_leader_count=counts.get(NotificationType.GROUP_LEADER.value, 0),
+    )
 
 
 def mark_notification_read(db: Session, user_id: uuid.UUID, notification_id: uuid.UUID) -> None:

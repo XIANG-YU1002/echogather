@@ -90,6 +90,58 @@ def test_accept_then_conflict_on_repeat(client, db_session):
     assert repeat_response.json()["error"]["code"] == "ORDER_STATUS_CONFLICT"
 
 
+def test_status_history_written_on_transitions(client, db_session):
+    """依圖 08：每次狀態變更都要寫入 order_status_history，拒絕時連同原因存為 note。"""
+    from app.models.order import OrderStatusHistory
+
+    def history_for(order_id):
+        return (
+            db_session.query(OrderStatusHistory)
+            .filter(OrderStatusHistory.order_id == order_id)
+            .order_by(OrderStatusHistory.created_at.asc())
+            .all()
+        )
+
+    leader_user, _profile, _group_buy, group_buy_product = _setup_leader_and_group_buy(
+        db_session, max_quantity=10
+    )
+    leader_headers = _leader_headers(client, leader_user)
+
+    # 建立即寫入一筆
+    accepted_id = _create_order(client, group_buy_product.id)
+    entries = history_for(accepted_id)
+    assert [e.status.value for e in entries] == ["pending_confirmation"]
+
+    # 接受 -> 追加一筆 pending_payment
+    assert client.post(
+        f"/api/v1/group-leader/orders/{accepted_id}/accept", headers=leader_headers
+    ).status_code == 200
+    entries = history_for(accepted_id)
+    assert [e.status.value for e in entries] == ["pending_confirmation", "pending_payment"]
+    assert entries[1].note is None
+
+    # 標記付款 -> 追加一筆 paid
+    assert client.post(
+        f"/api/v1/group-leader/orders/{accepted_id}/mark-paid", headers=leader_headers
+    ).status_code == 200
+    assert [e.status.value for e in history_for(accepted_id)] == [
+        "pending_confirmation",
+        "pending_payment",
+        "paid",
+    ]
+
+    # 另一張訂單拒絕 -> note 存拒絕原因
+    rejected_id = _create_order(client, group_buy_product.id)
+    assert client.post(
+        f"/api/v1/group-leader/orders/{rejected_id}/reject",
+        json={"reason": "本次可接受數量不足。"},
+        headers=leader_headers,
+    ).status_code == 200
+    entries = history_for(rejected_id)
+    assert [e.status.value for e in entries] == ["pending_confirmation", "rejected"]
+    assert entries[1].note == "本次可接受數量不足。"
+
+
 def test_reject_order_requires_reason(client, db_session):
     leader_user, _leader_profile, _group_buy, group_buy_product = _setup_leader_and_group_buy(
         db_session

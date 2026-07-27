@@ -179,8 +179,9 @@
   position: absolute;
   right: 0;
   top: calc(100% + 0.5rem);
-  width: 320px;
+  width: 380px;
   max-width: 90vw;
+  overflow: hidden;
   background-color: #fff;
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
@@ -191,9 +192,33 @@
 }
 
 .notification-bell-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
   padding: 0.75rem 1rem;
   font-weight: 700;
   border-bottom: 1px solid var(--color-border);
+}
+
+.notification-bell-mark-all {
+  margin-left: auto;
+  border: none;
+  background: none;
+  padding: 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--color-primary);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.notification-bell-mark-all:disabled {
+  color: var(--color-text-muted);
+  cursor: default;
+}
+
+.notification-bell-mark-all:hover:not(:disabled) {
+  text-decoration: underline;
 }
 
 .notification-bell-empty {
@@ -204,16 +229,21 @@
 }
 
 .notification-bell-list {
-  max-height: 320px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 360px;
   overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .notification-bell-item {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 0.15rem;
+  gap: 0.2rem;
   width: 100%;
+  min-width: 0;
   padding: 0.6rem 1rem;
   background: none;
   border: none;
@@ -234,15 +264,17 @@
   font-size: 0.85rem;
   font-weight: 600;
   color: var(--color-text);
+  overflow-wrap: anywhere;
 }
 
+/* 完整顯示訊息並自動換行；訂單編號這類長字串也強制斷行，避免撐出水平捲軸 */
 .notification-bell-item-message {
   font-size: 0.8rem;
   color: var(--color-text-muted);
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  line-height: 1.55;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .notification-bell-item-time {
@@ -1878,6 +1910,828 @@
     flex-direction: column;
     text-align: center;
   }
+}
+
+/* 團主訂單列表的批次操作列 */
+.gl-bulk-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.25rem;
+  padding: 0.9rem 1.1rem;
+  background-color: var(--color-bg);
+  border-radius: 10px;
+}
+
+.gl-bulk-actions .helper-text {
+  margin: 0;
+  flex: 1;
+  min-width: 15rem;
+}
+
+/* Notification center page (依圖 10) */
+.nc-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+@media (max-width: 1200px) {
+  .nc-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.nc-panel {
+  margin-bottom: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.nc-toolbar {
+  display: flex;
+  align-items: flex-end;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 0 1.25rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.nc-tabs {
+  border-bottom: none;
+  margin-bottom: 0;
+  flex: 1;
+}
+
+.nc-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 0;
+  flex-wrap: wrap;
+}
+
+.nc-read-filter {
+  width: auto;
+  font-size: 0.85rem;
+  padding: 0.4rem 0.6rem;
+}
+
+.nc-toolbar-actions .btn {
+  padding: 0.45rem 0.9rem;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.nc-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.nc-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.9rem;
+  width: 100%;
+  padding: 1rem 1.25rem;
+  border: none;
+  border-bottom: 1px solid var(--color-border);
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+  text-decoration: none;
+}
+
+.nc-item:hover {
+  background-color: #f7f7fb;
+}
+
+/* 未讀整列淺紫底 */
+.nc-item.unread {
+  background-color: #f4f4ff;
+}
+
+.nc-item.unread:hover {
+  background-color: #eeeeff;
+}
+
+.nc-item-avatar {
+  flex-shrink: 0;
+}
+
+.nc-item-avatar-img {
+  width: 2.6rem;
+  height: 2.6rem;
+  border-radius: 50%;
+  object-fit: cover;
+  background-color: #eceef5;
+}
+
+.nc-item-icon {
+  width: 2.6rem;
+  height: 2.6rem;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #e8e8ff;
+  color: var(--color-primary);
+}
+
+.nc-item-icon.leader {
+  background-color: #e3f7ec;
+  color: #1f8b56;
+}
+
+.nc-item-icon svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.nc-item-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.nc-item-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.nc-type-tag {
+  flex-shrink: 0;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.15rem 0.5rem;
+  border-radius: 6px;
+  background-color: #e8e8ff;
+  color: var(--color-primary-dark);
+}
+
+.nc-type-tag.leader {
+  background-color: #e3f7ec;
+  color: #1f8b56;
+}
+
+.nc-item-title {
+  font-weight: 700;
+  font-size: 0.95rem;
+  overflow-wrap: anywhere;
+}
+
+.nc-item-message {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.nc-item-actor {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+
+.nc-item-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+  padding-top: 0.15rem;
+}
+
+.nc-item-time {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.nc-unread-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background-color: var(--color-primary);
+  flex-shrink: 0;
+}
+
+.nc-item-arrow {
+  width: 1.1rem;
+  height: 1.1rem;
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+  margin-top: 0.2rem;
+}
+
+.nc-footer {
+  padding: 1rem 1.25rem;
+}
+
+/* 右側通知摘要 */
+.nc-summary-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 0;
+  font-size: 0.9rem;
+}
+
+.nc-summary-row + .nc-summary-row {
+  border-top: 1px solid var(--color-border);
+}
+
+.nc-summary-icon {
+  width: 2.2rem;
+  height: 2.2rem;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--color-bg);
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+}
+
+.nc-summary-icon.accent {
+  background-color: #e8e8ff;
+  color: var(--color-primary);
+}
+
+.nc-summary-icon svg {
+  width: 1.15rem;
+  height: 1.15rem;
+}
+
+.nc-summary-row .label {
+  color: var(--color-text);
+}
+
+.nc-summary-row .value {
+  margin-left: auto;
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+
+.nc-summary-row .value.accent {
+  color: var(--color-primary);
+}
+
+.nc-tip-title {
+  gap: 0.4rem;
+}
+
+.nc-tip-body {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  line-height: 1.7;
+}
+
+/* Cancellation request page (依圖 09) */
+.cr-badge {
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.cr-textarea-wrap {
+  position: relative;
+}
+
+.cr-textarea-wrap textarea {
+  width: 100%;
+  padding-bottom: 2rem;
+  resize: vertical;
+}
+
+.cr-counter {
+  position: absolute;
+  right: 0.85rem;
+  bottom: 0.7rem;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  pointer-events: none;
+}
+
+.cr-notice {
+  margin-top: 1.1rem;
+  align-items: flex-start;
+}
+
+.cr-notice-title {
+  margin: 0 0 0.4rem;
+  font-weight: 700;
+}
+
+.cr-notice ul {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+/* 右側時間軸上，目前狀態的黃底提示 */
+.cr-step-hint {
+  margin-top: 0.45rem;
+  background-color: #fff8e8;
+  color: #8a6415;
+  border-radius: 8px;
+  padding: 0.55rem 0.7rem;
+  font-size: 0.78rem;
+  line-height: 1.55;
+}
+
+.cr-rule-title {
+  color: #b0700f;
+}
+
+.cr-rules {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  color: var(--color-text-muted);
+}
+
+.cr-rule-statuses {
+  display: inline-block;
+  margin-top: 0.25rem;
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+/* 不符申請資格時的說明 */
+.cr-ineligible {
+  background-color: #fff8e8;
+  color: #8a6415;
+  align-items: flex-start;
+}
+
+.cr-pending-box {
+  margin-top: 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 0.9rem 1rem;
+  font-size: 0.85rem;
+}
+
+.cr-pending-box p {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+/* Member order detail page (依圖 08) */
+.od-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+@media (max-width: 1200px) {
+  .od-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.od-side {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  position: sticky;
+  top: 1.5rem;
+}
+
+.od-side .gb-panel {
+  margin-bottom: 0;
+}
+
+.od-title {
+  margin: 0 0 1rem;
+  font-size: 1.5rem;
+  font-weight: 800;
+}
+
+.od-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 2rem;
+  align-items: center;
+  margin-bottom: 1.25rem;
+  font-size: 0.9rem;
+}
+
+.od-meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.od-meta-item svg {
+  width: 1.05rem;
+  height: 1.05rem;
+  color: var(--color-text-muted);
+}
+
+.od-meta-label {
+  color: var(--color-text-muted);
+}
+
+.od-meta-value {
+  font-weight: 600;
+}
+
+.od-copy {
+  border: 1px solid var(--color-border);
+  background-color: var(--color-surface);
+  border-radius: 6px;
+  padding: 0.1rem 0.45rem;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.od-copy:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+/* 橫向進度條 */
+.od-progress {
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0;
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+}
+
+.od-progress-step {
+  flex: 1 1 0;
+  min-width: 6.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  position: relative;
+  text-align: center;
+}
+
+/* 節點之間的連接線 */
+.od-progress-step::before {
+  content: "";
+  position: absolute;
+  top: 1.1rem;
+  left: calc(-50% + 1.1rem);
+  width: calc(100% - 2.2rem);
+  height: 2px;
+  background-color: var(--color-border);
+}
+
+.od-progress-step:first-child::before {
+  display: none;
+}
+
+.od-progress-step.done::before {
+  background-color: var(--color-primary);
+}
+
+.od-progress-dot {
+  width: 2.2rem;
+  height: 2.2rem;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #f0f0f7;
+  color: var(--color-text-muted);
+  font-weight: 700;
+  font-size: 0.85rem;
+  position: relative;
+  z-index: 1;
+}
+
+.od-progress-step.done .od-progress-dot {
+  background-color: var(--color-primary);
+  color: #fff;
+}
+
+.od-progress-step.current .od-progress-dot {
+  box-shadow: 0 0 0 4px #e5e5ff;
+}
+
+.od-progress-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.od-progress-step.current .od-progress-label {
+  color: var(--color-primary);
+}
+
+.od-progress-time {
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+}
+
+.od-hint,
+.od-terminal {
+  background-color: #fff8e8;
+  color: #8a6415;
+}
+
+/* 訂單商品 */
+.od-item {
+  display: flex;
+  gap: 1.25rem;
+  align-items: flex-start;
+  padding: 0.5rem 0 1.1rem;
+}
+
+.od-item-thumb {
+  width: 8rem;
+  height: 8rem;
+  border-radius: 12px;
+  object-fit: cover;
+  flex-shrink: 0;
+  background-color: #eceef5;
+}
+
+.od-item-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.od-item-head {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.od-item-name {
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.od-item-figures {
+  display: flex;
+  gap: 3rem;
+  flex-wrap: wrap;
+}
+
+.od-item-figures > span {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.od-figure-label {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.od-figure-value {
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.od-total-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  border-top: 1px solid var(--color-border);
+  padding-top: 1rem;
+  font-weight: 700;
+}
+
+/* 狀態相關訊息 */
+.od-status-headline {
+  margin: 0 0 0.35rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.od-status-hint {
+  margin: 0 0 0.9rem;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  line-height: 1.6;
+}
+
+.od-status-box {
+  background-color: var(--color-bg);
+  border-radius: 10px;
+  padding: 0.9rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.od-status-line {
+  display: flex;
+  gap: 1rem;
+  font-size: 0.85rem;
+}
+
+.od-status-line .label {
+  color: var(--color-text-muted);
+  min-width: 4.5rem;
+  flex-shrink: 0;
+}
+
+.od-remaining {
+  color: var(--color-danger);
+  font-weight: 600;
+}
+
+/* 團規唯讀勾選 */
+.od-agree-readonly {
+  color: var(--color-text-muted);
+  cursor: default;
+}
+
+.od-agree-readonly input {
+  cursor: default;
+}
+
+/* 取消申請 */
+.od-subtle {
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: var(--color-text-muted);
+}
+
+.od-subtle-block {
+  margin: 0 0 0.6rem;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.od-cancellable-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 1rem;
+}
+
+.od-cancel-btn {
+  margin-bottom: 0.75rem;
+}
+
+.od-cancel-state {
+  margin: 0 0 0.9rem;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.od-cancel-history {
+  margin-top: 1rem;
+}
+
+.od-cancel-entry {
+  border-top: 1px solid var(--color-border);
+  padding-top: 0.75rem;
+  margin-top: 0.75rem;
+  font-size: 0.85rem;
+}
+
+.od-cancel-entry-head {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.35rem;
+}
+
+/* 底部操作列 */
+.od-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-top: 0.5rem;
+}
+
+.od-actions-right {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+
+.od-actions svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+/* 右側：狀態時間軸與狀態紀錄 */
+.od-timeline,
+.od-history {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.od-timeline-item,
+.od-history-item {
+  position: relative;
+  padding: 0 0 1.1rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.od-timeline-item:last-child,
+.od-history-item:last-child {
+  padding-bottom: 0;
+}
+
+/* 節點之間的直線 */
+.od-timeline-item::before,
+.od-history-item::before {
+  content: "";
+  position: absolute;
+  left: 0.31rem;
+  top: 0.9rem;
+  bottom: 0;
+  width: 2px;
+  background-color: var(--color-border);
+}
+
+.od-timeline-item:last-child::before,
+.od-history-item:last-child::before {
+  display: none;
+}
+
+.od-timeline-dot,
+.od-history-dot {
+  position: absolute;
+  left: 0;
+  top: 0.32rem;
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 50%;
+  background-color: #d5d7e5;
+}
+
+.od-timeline-item.done .od-timeline-dot {
+  background-color: var(--color-primary);
+}
+
+.od-timeline-item.current .od-timeline-dot {
+  box-shadow: 0 0 0 3px #e5e5ff;
+}
+
+.od-history-dot {
+  background-color: var(--color-primary);
+}
+
+.od-timeline-time,
+.od-history-time {
+  font-size: 0.78rem;
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.od-timeline-label,
+.od-history-label {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.od-timeline-item:not(.done) .od-timeline-label {
+  color: var(--color-text-muted);
+}
+
+.od-timeline-desc,
+.od-history-note {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  line-height: 1.5;
+}
+
+.od-leader-contact {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.od-leader-contact svg {
+  width: 1.1rem;
+  height: 1.1rem;
 }
 
 /* Member order list page (依圖 07) */

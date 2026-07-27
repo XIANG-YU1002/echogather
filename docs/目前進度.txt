@@ -773,10 +773,10 @@ frontend/src/pages/admin/AnnouncementListPage.jsx 改為 35_ 版面：左側公�
 ✅ 跨頁：可選款式/角色功能（分角色庫存，前後端＋migration 0003＋seed）
 ✅ 跨頁：跟團清單→購物車 命名調整＋Header 購物車圖示與紅點數量
 ✅ 圖 06 訂單確認頁 OrderConfirmPage（2026-07-27 完成，已經使用者瀏覽器實測確認）
-✅ 圖 07 會員訂單列表頁 OrdersPage（2026-07-27 完成，待使用者實測確認）
-⬜ 圖 08 會員訂單詳情頁 OrderDetailPage（含所選角色顯示）
-⬜ 圖 09 取消訂單申請頁 CancellationRequestPage
-⬜ 圖 10 通知中心頁 NotificationsPage
+✅ 圖 07 會員訂單列表頁 OrdersPage（2026-07-27 完成，已經使用者實測確認）
+✅ 圖 08 會員訂單詳情頁 OrderDetailPage（2026-07-27 完成，已經使用者實測確認）
+✅ 圖 09 取消訂單申請頁 CancellationRequestPage（2026-07-27 完成，已經使用者實測確認）
+✅ 圖 10 通知中心頁 NotificationsPage（2026-07-27 完成，已經使用者實測確認）
 ⬜ 圖 11 我的收藏頁 FavoritesPage
 ⬜ 圖 12 團主列表頁 GroupLeaderListPage
 ⬜ 圖 13 搜尋結果頁 SearchPage
@@ -985,3 +985,257 @@ B 類｜上一批 migration 0003 改了 schema 但未同步的陳舊結構測試
 C 類｜本批造成的回歸（1 個）→ 已修正
   - test_admin_dashboard_api::test_current_group_buys_list 原本用同一團主+同一活動
     連開兩團，違反新的 uq_group_buy_leader_activity_open。已改為第二團使用另一個活動。
+
+
+--------------------------------------------------------------------------------
+第 3 批續 2：圖 08 會員訂單詳情頁 OrderDetailPage
+--------------------------------------------------------------------------------
+記錄時間：2026-07-27
+
+【使用者裁決紀錄（圖 08）】
+1. 右下「狀態紀錄」的各狀態時間戳 → 決議「新增狀態歷史表（完整實作）」。
+2. 收單期限與倒數 → 決議「join group_buy 取即時值」，不新增快照欄位。
+   影響：團主延期後訂單頁會跟著更新（非下單當時快照），已於 docs/05 註明。
+3. 二補「是（多退少補）」、滿贈「是（滿額贈…）」的括號說明 → 決議「只顯示是／否」
+   （資料庫只有布林值，不造假資料），與圖 06 一致。
+4. 「主要聯絡方式」圖上顯示兩個平台圖示 → 決議「改為單一平台，團主設定時必須選擇
+   一個平台為主要平台」。現行 schema 的 group_buy.contact_platform 本來就是 NOT NULL
+   單選，建立／編輯開團表單也都是必選下拉，故無需變更，僅前端改為顯示該平台圖示。
+5. 團規編號清單 → 沿用圖 06 決議「原樣顯示不加編號」（pre-wrap 保留換行）。
+
+【新增資料表：order_status_history（migration 0005）】
+- 欄位：id / order_id(FK CASCADE) / status / note / created_at
+- 約束：note 有值時不得為空白；index (order_id, created_at)
+- 寫入點共三處，與訂單狀態變更同一個 Transaction：
+  1) order_service.create_order -> pending_confirmation
+  2) group_leader_order_service._transition -> pending_payment/rejected/paid/shipped/completed
+  3) group_leader_order_service.approve_cancellation -> cancelled
+- note 於拒絕時存拒絕原因、取消核准時存團主回覆。
+- migration 對既有訂單補寫：以 created_at 補一筆建立紀錄；若目前狀態已非
+  pending_confirmation，再以 updated_at 補一筆目前狀態。
+
+【踩到的坑（已解）】
+- create_status_history 原本有 db.flush()，導致 reject_order 時「狀態改 rejected」
+  的 UPDATE 先送出，而此時 rejection_reason 尚未設定，違反
+  ck_group_order_rejection_reason_pair。改為不 flush，交由 commit 時一次送出。
+- migration 內用 sa.Enum(..., create_type=False) 無效，仍會發出 CREATE TYPE，
+  必須改用 sqlalchemy.dialects.postgresql.ENUM。
+
+【後端其他變更】
+- OrderDetailResponse 新增：group_leader_id、deadline_at、
+  member_facebook_contact／member_discord_contact／member_line_contact、status_history。
+- order_repository 新增 create_status_history／list_status_history。
+
+【前端變更】
+- OrderDetailPage 全面改寫：麵包屑、左主欄＋右側欄、頁首卡（訂單編號含複製鈕／
+  建立時間／目前狀態）、橫向圖示進度條（含連接線與各節點時間）、狀態提示條、
+  訂單商品大圖卡（含活動標籤與所選角色）、會員聯絡資料卡（三平台品牌圖示）、
+  狀態相關訊息卡（收單期限＋剩餘倒數）、團規滾動框＋唯讀勾選、
+  取消申請卡（可申請狀態 chips／目前狀態／提醒／歷史）、底部操作列，
+  右側三張卡：狀態時間軸／開團資料（含團主公開頁連結）／狀態紀錄。
+- 新增 CSS：.od-* 系列。
+- 已補上先前待辦的「訂單顯示所選角色」（chosen_character_name）。
+
+【測試】
+- test_order_api.py：詳情測試補驗 group_leader_id／deadline_at／三個會員聯絡欄位／
+  status_history 首筆為 pending_confirmation。
+- test_group_leader_order_api.py：新增 test_status_history_written_on_transitions，
+  驗證建立→接受→標記付款的歷史序列，以及拒絕時 note 存拒絕原因。
+- test_models_metadata.py：EXPECTED_TABLES 補 order_status_history，表數改 20。
+- 上述兩檔共 20 passed。
+
+
+--------------------------------------------------------------------------------
+第 3 批續 3：使用者追加需求（團主導覽、訂單通知、批次出貨、通知面板、訂單流水號）
+--------------------------------------------------------------------------------
+記錄時間：2026-07-27
+
+--- 1. 會員側邊導覽：團主顯示「團主後台」---
+- MemberLayout 原本寫死「團主申請」，導致已是團主者點進個人資料仍看到申請入口。
+- 改為依 user.group_leader 判斷：已是團主 → 「團主後台」(/group-leader)，
+  否則 → 「團主申請」(/group-leader-application)。與 AvatarMenu 的既有判斷一致。
+
+--- 2. 訂單通知補齊 ---
+盤點後的現況與變更：
+  事件                    對象    變更前   變更後
+  會員下訂單              團主    無       ✅ 新增「收到新訂單」
+  團主接受訂單            會員    已有     維持（「訂單已受理」）
+  團主拒絕訂單            會員    已有     維持
+  團主標記已出貨          會員    無       ✅ 新增「訂單已出貨」
+  取消申請核准／拒絕      會員    已有     維持
+- 通知連結修正：_source_and_target_url 原本一律導向 /orders/{id}（會員頁），
+  寄給團主的訂單通知點下去會 404。改為比對 notification.user_id 與 order.user_id，
+  收件人不是下單者時導向 /group-leader/orders/{id}。
+- 「會員付款通知團主」經使用者確認取消：現行流程沒有會員付款動作，
+  付款是由團主標記（mark-paid）。
+
+--- 3. 團主一鍵批次出貨 ---
+- 新端點 POST /api/v1/group-leader/group-buys/{group_buy_id}/orders/mark-all-shipped
+- service.mark_all_shipped：驗證開團屬於該團主 → 以 FOR UPDATE 鎖定該團所有
+  paid 訂單 → 逐筆轉為 shipped、寫入狀態歷史、通知會員 → 單次 commit。
+- 只處理 paid 狀態；回應同時回報略過的待確認／待付款筆數，讓團主知道還有幾張沒到
+  可出貨狀態。
+- 前端：團主訂單列表在「有帶 group_buy_id 篩選」時顯示批次操作列與確認 Modal；
+  未帶篩選時顯示提示，引導從「我的開團」進入。
+
+--- 4. 通知鈴鐺面板修正 ---
+- 問題：面板出現水平捲軸、文字被截斷、還有多餘的項目符號。
+- 根因：.notification-bell-list 沒有清掉 list-style 與 padding；
+  .notification-bell-item-message 只有 -webkit-line-clamp 卻沒有斷詞規則，
+  訂單編號這類長字串撐破容器。
+- 修正：清掉 list-style/padding；移除 line-clamp 改為完整換行顯示
+  （overflow-wrap: anywhere + word-break: break-word）；面板加寬 320→380px；
+  容器 overflow: hidden、清單 overflow-x: hidden。
+- 新增「全部標記為已讀」按鈕於面板標題列（通知中心整頁本來就有，缺的只有面板）。
+
+--- 5. 訂單編號改為每日流水號 ---
+【使用者裁決】流水範圍：每日重新從 1 開始；格式：照參考圖 WG260727-000001。
+- 舊：WG-20260727-6A5E55（WG-西元年月日-6 碼隨機十六進位）
+- 新：WG260727-000001（WG + YYMMDD + 連字號 + 6 位流水）
+- 新增 order_number_counter 表（date_key PK / last_value），migration 0006。
+- 取號用單一原子語句 INSERT ... ON CONFLICT DO UPDATE ... RETURNING，
+  併發下單不會搶到相同號碼。
+- 已知取捨：交易 rollback 時序號不回收，編號可能跳號。保證唯一優先於連號無缺。
+- 既有訂單編號不追溯修改（對外識別碼，改動會造成對帳困難）。
+
+【測試】
+- test_order_api.py 新增 test_order_number_is_daily_serial（格式 + 連號遞增），
+  既有斷言由 startswith("WG-") 改為 regex WG\d{6}-\d{6}。
+- test_models_metadata.py：EXPECTED_TABLES 補 order_number_counter，表數改 21。
+- test_order_api.py + test_models_metadata.py 共 16 passed；
+  加上 test_group_leader_order_api.py 與 test_notification_api.py 共 26 passed。
+
+
+--------------------------------------------------------------------------------
+第 3 批續 4：示範資料擴充 ＋ 圖 09 取消訂單申請頁 ＋ 購物車紅點修正
+--------------------------------------------------------------------------------
+記錄時間：2026-07-27
+
+--- 1. 示範資料擴充（seed_demo_data.py 全面改寫）---
+依使用者要求：團主與團員各 5 個帳號、每位團主都要開團且開團資料不同、
+團員只留一位沒有下單、其餘至少一筆訂單。
+
+建立內容（密碼一律 Passw0rd1）：
+- 1 位管理員 demo-admin@example.com
+- 5 位團主 demo-leader1~5@example.com，各一筆進行中開團，設定全部不同：
+    月影團        匯款(有備註)      二補是 滿贈是 Discord  14天 2商品
+    星辰大海      取貨付款          二補否 滿贈否 LINE      7天 1商品
+    風鈴草        匯款(有備註)      二補否 滿贈是 Facebook 21天 2商品
+    月見團子      取貨付款(有備註)  二補是 滿贈否 Discord  10天 1商品
+    小明不想上班  匯款              二補否 滿贈是 LINE     30天 2商品
+- 5 位團員 demo-member1~5@example.com
+    member1 刻意 0 筆訂單（空狀態測試用）
+    member2 2 筆訂單，另持有一張未送出的購物車（供圖 05／06 預覽）
+    member3~5 各 2 筆訂單
+- 8 筆訂單涵蓋全部 7 種狀態，另含 1 筆待處理與 1 筆已核准的取消申請。
+- 訂單皆補寫完整狀態歷史（依終點狀態的推進路徑），讓圖 08 時間軸有內容。
+
+注意：5 個團都開在「3.4 官方周邊（示範）」，因為目前只有這個開放活動底下有上架
+商品（另一個開放活動「4343」沒有商品）。這不違反 uq_group_buy_leader_activity_open
+（限制是同一團主對同一活動，5 位不同團主各開一團合法）。
+
+實作踩到的坑：group_leader_profile 的 Facebook 欄位叫 facebook_url（不是
+facebook_contact，那是 app_user 的欄位），需要兩組不同的 contact helper。
+
+一致性檢查（皆為 0）：小計不符、總額不符、缺狀態歷史、超賣、團主對自己開團下單、
+違反一團主一活動一團。
+
+--- 2. 圖 09 取消訂單申請頁 CancellationRequestPage 改版 ---
+【使用者裁決紀錄】
+1. 「撤回申請」：參考圖注意事項寫「團主處理前可在訂單詳情頁撤回申請」，但後端沒有
+   此 API、規格 §22 也沒有這條規則 → 決議「不做撤回功能，改為送出前跳確認彈窗」。
+2. 「查看完整取消規則」連結（該頁面不存在）→ 決議「保持目前這樣」＝
+   取消規則提醒卡照做（三條規則），但不放指向不存在頁面的連結。
+3. 進頁資格防呆 → 決議「一起修」。
+
+【變更內容】
+- 麵包屑（四層）、✕ 圓形徽章標題、左主欄＋右側欄兩張卡。
+- 訂單資訊卡：訂單編號（含複製鈕）／建立時間／目前狀態並排；商品改大圖卡並顯示
+  活動標籤與所選角色；商品總額改分隔線＋大字紫色。
+- 取消原因卡：加說明文字，字數計數器移到 textarea 右下角內側；
+  注意事項改為紫底卡＋項目清單（移除「可撤回」那條，因為不做該功能）。
+- 送出前跳 ConfirmModal 確認（取代原本直接送出）。
+- 右側「訂單狀態流程」：五狀態直式時間軸＋各狀態時間戳，目前狀態下方黃底提示。
+- 右側「取消規則提醒」：⚠ 圖示＋三條規則（無外部連結）。
+- 進頁防呆（依 Business Rules §22.1／§22.4）：狀態不符或已有待處理申請時，
+  不顯示表單，改顯示「無法申請取消」與具體原因；已有待處理申請時另顯示該申請的
+  狀態、時間與原因。底部只留「返回訂單詳情」。
+
+--- 3. 共用重構：constants/orderStatus.js ---
+圖 07／08／09 都需要訂單狀態文案與流程定義，原本圖 08 各寫一份。抽出共用模組：
+STATUS_LABELS、CANCELLABLE_STATUSES、TIMELINE_STEPS、firstOccurrenceMap、
+formatOrderDateTime。圖 08 OrderDetailPage 改為引用（畫面輸出不變，純重構）。
+
+--- 4. Bug 修正：下單後 Header 購物車紅點殘留 ---
+- 現象：購物車送出訂單後，Header 的購物車 icon 紅點與數量沒有消失。
+- 原因：後端 order_service.create_order 最後確實會 delete_follow_list，
+  但前端 OrderConfirmPage 送出成功後只 navigate，沒有呼叫 CartContext 的 refresh()，
+  導致 count 仍是舊值，要重新整理或重新登入才會歸零。
+- 修正：送出成功後先 await refreshCart() 再導頁。
+
+
+--------------------------------------------------------------------------------
+第 3 批續 5：圖 10 通知中心頁 ＋ 公告示範資料
+--------------------------------------------------------------------------------
+記錄時間：2026-07-27
+
+【使用者裁決紀錄（圖 10）】
+1. 右側「通知摘要」三個數字 → 決議「未讀總數 ＋ 各類型總數（含已讀）」。
+2. 團主公告顯示團主頭像 → 決議「擴充 API 回傳頭像」。
+3. 「全部標記為已讀 ⌄」的下拉箭頭 → 決議「保留按鈕（單一動作，不做下拉），
+   並在按鈕左邊新增下拉選單可依已讀狀態篩選（全部通知／只看未讀／只看已讀）」。
+4. 底部同時有頁碼與「載入更多」→ 決議「只留頁碼」。
+
+【後端變更】
+- 新增 GET /api/v1/notifications/summary（NotificationSummaryResponse）：
+  unread_count（未讀總數）＋ system_count／group_leader_count（各類型總筆數，含已讀）。
+  原 /unread-count 保留給 Header 鈴鐺使用。
+- notification_repository 新增 count_by_type。
+- NotificationItem 新增 actor_name／actor_avatar_url：串接
+  notification → announcement → group_leader_profile → app_user.avatar_url，
+  只有團主公告有值，平台公告與系統通知為 None。
+- 類型篩選與已讀篩選後端本來就支援（notification_type／is_read），無需改動。
+
+【前端變更】
+- NotificationsPage 全面改寫：麵包屑、鈴鐺徽章標題、左主欄＋右側欄；
+  類型頁籤（全部／系統通知／團主公告，沿用 .ol-tabs 底線樣式）；
+  已讀狀態下拉；全部標記為已讀（無未讀時停用）；
+  列表項目＝圓形圖示或團主頭像 ＋ 類型標籤（系統紫底／團主綠底）＋ 標題 ＋ 內文
+  ＋ 相對時間（剛剛／N 分鐘前／N 小時前／昨天 HH:MM／日期）＋ 未讀藍點 ＋ 右箭頭；
+  未讀整列淺紫底；分頁只留頁碼；
+  右側「通知摘要」卡（三列，未讀數紫色強調）與「小提醒」卡。
+- api/notifications.js：getNotifications 支援 notificationType／isRead，
+  新增 getNotificationSummary。
+- 新增 CSS：.nc-* 系列。
+
+【公告示範資料（seed_demo_data.py）】
+- 2 則平台公告（管理員發布，通知全部使用者，notification_type = system）
+- 3 則團主公告（月影團／風鈴草／小明不想上班發布，
+  收件人為該團未完成訂單的會員，notification_type = group_leader；
+  若該團當下沒有未完成訂單則發給全部示範會員，確保通知中心有內容可看）
+- 產生結果：系統通知 22 則、團主公告 8 則。
+  member5 有 2 則系統通知 ＋ 1 則團主公告，可同時驗證兩種類型樣式。
+
+實作踩到的坑：announcement 的 ck_announcement_type_scope_pair 約束要求
+**平台公告必須 is_public = false**（平台公告只以通知形式送達，不另設公開頁），
+一開始寫成 True 會違反約束。
+
+【測試】
+- test_notification_api.py 與 test_group_leader_announcement_api.py 全過。
+- 順手修正 test_admin_announcement_api.py::test_create_platform_announcement_notifies_all_members
+  的寫死斷言：原本 assert recipient_count == 2（測試剛寫好時剛好 2 個帳號），
+  但測試跑在正式 Supabase 上，示範帳號也算已註冊使用者，所以示範資料一變就壞。
+  改為對照 AppUser 實際筆數（select count(*)），語意更精確且不脆弱。
+  → 這解掉先前分類的「A 類共用資料庫」8 個既有失敗中的 1 個，剩 7 個為
+    測試寫死角色名「今汐」與示範資料撞 uq_character_name_lower，尚未處理。
+
+--- 補充：Bug 修正 —— 通知已讀狀態未即時同步 Header 鈴鐺 ---
+- 現象：在通知中心頁按「全部標記為已讀」，Header 鈴鐺的紅點不會消失，需重新整理。
+- 原因：與購物車紅點同一類問題 —— NotificationBell 與 NotificationsPage 各自維護
+  一份未讀數，兩者之間沒有連結。
+- 修法：比照既有 CartContext 新增 context/NotificationContext.jsx 持有 unreadCount
+  與 refresh()，掛在 App.jsx 的 Provider 樹（AuthProvider > CartProvider >
+  NotificationProvider）。NotificationBell 刪除自有 state 改讀 Context；
+  NotificationsPage 在單則已讀與全部已讀後 await refreshUnreadCount()。
+- 現在四個入口改變已讀狀態都會即時同步紅點：鈴鐺面板點單則／鈴鐺面板全部已讀／
+  通知中心頁點單則／通知中心頁全部已讀。

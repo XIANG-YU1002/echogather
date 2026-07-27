@@ -1,3 +1,5 @@
+import re
+
 from app.models.enums import OrderStatus
 from tests.factories import (
     create_activity,
@@ -41,7 +43,8 @@ def test_create_order_success(client, db_session):
     data = response.json()["data"]
     assert data["status"] == "pending_confirmation"
     assert data["product_total_amount"] == "400.00"
-    assert data["order_number"].startswith("WG-")
+    # 訂單編號為每日流水：WG{YYMMDD}-{6 位流水}
+    assert re.fullmatch(r"WG\d{6}-\d{6}", data["order_number"]), data["order_number"]
 
     follow_list_response = client.get("/api/v1/follow-list", headers=headers)
     assert follow_list_response.json()["data"] is None
@@ -117,6 +120,40 @@ def test_get_my_orders_list_and_detail(client, db_session):
     assert detail["items"][0]["quantity"] == 3
     assert detail["cancellation_requests"] == []
     assert detail["pending_cancellation_request"] is None
+    # 依圖 08 新增的欄位
+    assert detail["group_leader_id"]
+    assert detail["deadline_at"]
+    assert "member_facebook_contact" in detail
+    assert "member_discord_contact" in detail
+    assert "member_line_contact" in detail
+    # 建立訂單即寫入一筆狀態歷史
+    assert len(detail["status_history"]) == 1
+    assert detail["status_history"][0]["status"] == "pending_confirmation"
+    assert detail["status_history"][0]["note"] is None
+
+
+def test_order_number_is_daily_serial(client, db_session):
+    """訂單編號為 WG{YYMMDD}-{6 位流水}，同一天內連號遞增。"""
+    from datetime import datetime, timezone
+
+    _, group_buy_product = _setup_group_buy_product(db_session, max_quantity=10)
+    expected_date_key = datetime.now(timezone.utc).strftime("%y%m%d")
+
+    numbers = []
+    for _ in range(2):
+        _, token = register_and_login(client)
+        headers = auth_headers(token)
+        _add_follow_list_item(client, headers, group_buy_product.id, 1)
+        response = client.post("/api/v1/orders", json={"rules_accepted": True}, headers=headers)
+        assert response.status_code == 201, response.text
+        numbers.append(response.json()["data"]["order_number"])
+
+    for number in numbers:
+        assert re.fullmatch(rf"WG{expected_date_key}-\d{{6}}", number), number
+
+    first_serial = int(numbers[0].split("-")[1])
+    second_serial = int(numbers[1].split("-")[1])
+    assert second_serial == first_serial + 1
 
 
 def test_get_my_orders_filters(client, db_session):

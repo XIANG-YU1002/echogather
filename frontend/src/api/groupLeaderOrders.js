@@ -40,6 +40,14 @@ export function markOrderShipped(orderId, token) {
   return apiRequest(`/group-leader/orders/${orderId}/mark-shipped`, { method: "POST", token });
 }
 
+/** 一鍵將該開團所有「已付款」訂單標記為已出貨。 */
+export function markAllOrdersShipped(groupBuyId, token) {
+  return apiRequest(`/group-leader/group-buys/${groupBuyId}/orders/mark-all-shipped`, {
+    method: "POST",
+    token,
+  });
+}
+
 export function completeOrder(orderId, token) {
   return apiRequest(`/group-leader/orders/${orderId}/complete`, { method: "POST", token });
 }

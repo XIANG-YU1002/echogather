@@ -1,4 +1,7 @@
+from sqlalchemy import func, select
+
 from app.models.enums import UserRole
+from app.models.user import AppUser
 from tests.factories import create_user
 from tests.utils import auth_headers, login, register_and_login
 
@@ -21,7 +24,10 @@ def test_create_platform_announcement_notifies_all_members(client, db_session):
 
     assert response.status_code == 201
     data = response.json()["data"]
-    assert data["recipient_count"] == 2  # admin + member, all registered users
+    # 平台公告發給所有已註冊使用者。測試資料庫與示範資料共用，
+    # 因此對照實際使用者數而非寫死數字。
+    total_users = db_session.execute(select(func.count()).select_from(AppUser)).scalar_one()
+    assert data["recipient_count"] == total_users
 
     member_notifications = client.get("/api/v1/notifications", headers=member_headers).json()[
         "data"

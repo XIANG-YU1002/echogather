@@ -87,6 +87,17 @@ def mark_paid(
     return envelope({"id": str(order.id), "status": order.status.value})
 
 
+@router.post("/group-buys/{group_buy_id}/orders/mark-all-shipped")
+def mark_all_shipped(
+    group_buy_id: uuid.UUID,
+    profile: GroupLeaderProfile = Depends(get_current_active_group_leader_profile),
+    db: Session = Depends(get_db),
+) -> dict:
+    """一鍵將該開團所有「已付款」訂單標記為已出貨。"""
+    result = group_leader_order_service.mark_all_shipped(db, profile, group_buy_id)
+    return envelope(result)
+
+
 @router.post("/orders/{order_id}/mark-shipped")
 def mark_shipped(
     order_id: uuid.UUID,

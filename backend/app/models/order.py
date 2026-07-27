@@ -6,6 +6,7 @@ from sqlalchemy import (
     DateTime,
     Enum,
     ForeignKey,
+    Index,
     Integer,
     Numeric,
     String,
@@ -186,4 +187,46 @@ class CancellationRequest(UUIDPrimaryKeyMixin, TimestampMixin, Base):
             """,
             name="ck_cancellation_request_status_processed_pair",
         ),
+    )
+
+
+class OrderStatusHistory(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
+    """訂單狀態異動歷史。
+
+    依圖 08 右側「狀態紀錄」需求新增：訂單每次狀態變更（含建立）寫入一筆，
+    供訂單詳情頁顯示各狀態的實際發生時間。
+    """
+
+    __tablename__ = "order_status_history"
+
+    order_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("group_order.id", ondelete="CASCADE"), nullable=False
+    )
+    status: Mapped[OrderStatus] = mapped_column(order_status_enum, nullable=False)
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    __table_args__ = (
+        CheckConstraint(
+            "note IS NULL OR length(trim(note)) > 0",
+            name="ck_order_status_history_note_not_blank",
+        ),
+        Index("ix_order_status_history_order_created", "order_id", "created_at"),
+    )
+
+
+class OrderNumberCounter(Base):
+    """訂單編號的每日流水號計數器。
+
+    依使用者決議，訂單編號格式為 WG{YYMMDD}-{6 位流水}，流水號每日重新從 1 開始。
+    以 `INSERT ... ON CONFLICT DO UPDATE ... RETURNING` 單一原子語句取號，
+    避免併發下單時搶到相同號碼。
+    """
+
+    __tablename__ = "order_number_counter"
+
+    date_key: Mapped[str] = mapped_column(String(6), primary_key=True)
+    last_value: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    __table_args__ = (
+        CheckConstraint("last_value > 0", name="ck_order_number_counter_last_value_positive"),
     )

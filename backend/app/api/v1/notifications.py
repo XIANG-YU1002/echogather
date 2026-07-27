@@ -41,6 +41,15 @@ def get_unread_count(
     return envelope(result.model_dump(mode="json"))
 
 
+@router.get("/summary")
+def get_summary(
+    current_user: AppUser = Depends(get_current_user), db: Session = Depends(get_db)
+) -> dict:
+    """圖 10 右側「通知摘要」：未讀總數與各類型總筆數。"""
+    result = notification_service.get_summary(db, current_user.id)
+    return envelope(result.model_dump(mode="json"))
+
+
 @router.patch("/{notification_id}/read")
 def mark_notification_read(
     notification_id: uuid.UUID,

@@ -6,7 +6,13 @@ from app.models.follow_list import FollowList, FollowListItem
 from app.models.group_buy import GroupBuy, GroupBuyProduct
 from app.models.group_leader import GroupLeaderApplication, GroupLeaderProfile
 from app.models.notification import Notification
-from app.models.order import CancellationRequest, GroupOrder, OrderItem
+from app.models.order import (
+    CancellationRequest,
+    GroupOrder,
+    OrderItem,
+    OrderNumberCounter,
+    OrderStatusHistory,
+)
 from app.models.product import Character, Product, ProductCharacter, ProductImage
 from app.models.user import AppUser
 
@@ -26,6 +32,8 @@ __all__ = [
     "FollowListItem",
     "GroupOrder",
     "OrderItem",
+    "OrderNumberCounter",
+    "OrderStatusHistory",
     "CancellationRequest",
     "ProductFavorite",
     "Announcement",

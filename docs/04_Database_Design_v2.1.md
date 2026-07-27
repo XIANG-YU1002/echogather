@@ -1951,19 +1951,71 @@ rejection_reason = NULL
 
 ## Order Number
 
-格式可使用：
+> 變更紀錄（2026-07-27，migration `0006_order_number_serial`）：
+> 依使用者決議，由隨機字串改為每日流水號。舊訂單編號不追溯修改。
+
+格式：
 
 ```text
-WG-20260801-A1B2C3
+WG260727-000001
 ```
 
 包含：
 
-- 固定前綴
-- 建立日期
-- 隨機字串
+- 固定前綴 `WG`
+- 建立日期 `YYMMDD`（UTC）
+- 連字號
+- 6 位每日流水序號，當日從 `000001` 起遞增，隔日重新歸零
 
-訂單網址仍需驗證資源擁有權。
+取號方式見 §6.15c。訂單網址仍需驗證資源擁有權。
+
+---
+
+# 6.15c Order Number Counter Table
+
+Table Name：
+
+```text
+order_number_counter
+```
+
+用途：
+
+保存每日已發出的最後一個訂單流水號，供 `WG{YYMMDD}-{序號}` 取號使用。
+
+---
+
+## Columns
+
+| Column | Type | Nullable | Default | Description |
+|---|---|---:|---|---|
+| date_key | VARCHAR(6) | No | — | Primary Key，`YYMMDD`（UTC） |
+| last_value | INTEGER | No | — | 該日已發出的最後序號 |
+
+---
+
+## Constraints
+
+```sql
+CHECK (last_value > 0)
+```
+
+---
+
+## Allocation
+
+取號以單一原子語句完成，併發下單不會拿到相同號碼：
+
+```sql
+INSERT INTO order_number_counter (date_key, last_value)
+VALUES (:date_key, 1)
+ON CONFLICT (date_key)
+DO UPDATE SET last_value = order_number_counter.last_value + 1
+RETURNING last_value;
+```
+
+注意：序號在交易 rollback 時不會回收（PostgreSQL 的 upsert 已寫入該列），
+因此編號可能出現跳號。這是刻意取捨——保證唯一與不搶號優先於連號無缺。
 
 ---
 
@@ -2236,6 +2288,62 @@ group_order.status = 原狀態
 - 同時只能有一筆 `pending`
 - `approved` 後訂單已取消，不可再申請
 - `rejected` 後可重新申請
+
+---
+
+# 6.15b Order Status History Table
+
+> 新增紀錄（2026-07-27，migration `0005_order_status_history`）：
+> 依圖 08 會員訂單詳情頁的「狀態紀錄」需求新增。
+
+Table Name：
+
+```text
+order_status_history
+```
+
+用途：
+
+記錄訂單每一次狀態變更（含建立時的 `pending_confirmation`），
+供訂單詳情頁顯示各狀態的實際發生時間。
+
+---
+
+## Columns
+
+| Column | Type | Nullable | Default | Description |
+|---|---|---:|---|---|
+| id | UUID | No | uuid4 | Primary Key |
+| order_id | UUID | No | — | 所屬訂單，`ON DELETE CASCADE` |
+| status | OrderStatus | No | — | 變更後的狀態 |
+| note | TEXT | Yes | NULL | 補充說明；拒絕時存拒絕原因、取消核准時存團主回覆 |
+| created_at | TIMESTAMPTZ | No | now() | 狀態變更時間 |
+
+---
+
+## Constraints
+
+```sql
+CHECK (note IS NULL OR LENGTH(TRIM(note)) > 0)
+
+CREATE INDEX ix_order_status_history_order_created
+    ON order_status_history (order_id, created_at);
+```
+
+---
+
+## Write Points
+
+狀態歷史只在下列三處寫入，且與訂單狀態變更在同一個 Transaction：
+
+```text
+1. order_service.create_order          -> pending_confirmation
+2. group_leader_order_service._transition
+     -> pending_payment / rejected / paid / shipped / completed
+3. group_leader_order_service.approve_cancellation -> cancelled
+```
+
+不在此表寫入的操作（例如取消申請被拒絕）不改變訂單狀態，故不產生紀錄。
 
 # 6.16 Product Favorite Table
 

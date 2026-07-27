@@ -1,7 +1,11 @@
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { getGroupLeaderOrders } from "../../api/groupLeaderOrders.js";
+import { getGroupLeaderOrders, markAllOrdersShipped } from "../../api/groupLeaderOrders.js";
 import { useAuth } from "../../context/AuthContext.jsx";
+import { ApiError } from "../../api/client.js";
+import Alert from "../../components/common/Alert.jsx";
+import Button from "../../components/common/Button.jsx";
+import ConfirmModal from "../../components/common/ConfirmModal.jsx";
 import EmptyState from "../../components/common/EmptyState.jsx";
 import ErrorState from "../../components/common/ErrorState.jsx";
 import PageLoader from "../../components/common/PageLoader.jsx";
@@ -40,6 +44,9 @@ export default function OrderListPage() {
   const [orders, setOrders] = useState(null);
   const [pagination, setPagination] = useState(null);
   const [error, setError] = useState(false);
+  const [confirmShipAll, setConfirmShipAll] = useState(false);
+  const [shippingAll, setShippingAll] = useState(false);
+  const [feedback, setFeedback] = useState(null);
 
   function load() {
     setError(false);
@@ -63,6 +70,37 @@ export default function OrderListPage() {
     setKeyword(keywordInput.trim());
   }
 
+  async function handleShipAll() {
+    setShippingAll(true);
+    setFeedback(null);
+    try {
+      const response = await markAllOrdersShipped(groupBuyId, token);
+      const { shipped_count, skipped_pending_confirmation, skipped_pending_payment } =
+        response.data;
+      const skipped = skipped_pending_confirmation + skipped_pending_payment;
+      setFeedback({
+        type: shipped_count > 0 ? "success" : "info",
+        message:
+          shipped_count > 0
+            ? `已將 ${shipped_count} 張已付款訂單標記為已出貨。` +
+              (skipped > 0
+                ? `另有 ${skipped} 張尚未進入可出貨狀態（待確認 ${skipped_pending_confirmation} 張、待付款 ${skipped_pending_payment} 張），未受影響。`
+                : "")
+            : "此開團目前沒有「已付款」狀態的訂單可出貨。",
+      });
+      setConfirmShipAll(false);
+      setPage(1);
+      load();
+    } catch (err) {
+      setFeedback({
+        type: "error",
+        message: err instanceof ApiError ? err.message : "批次出貨時發生錯誤，請稍後再試。",
+      });
+    } finally {
+      setShippingAll(false);
+    }
+  }
+
   return (
     <>
       <div className="page-header">
@@ -74,6 +112,23 @@ export default function OrderListPage() {
           </p>
         )}
       </div>
+
+      {feedback && <Alert type={feedback.type}>{feedback.message}</Alert>}
+
+      {groupBuyId ? (
+        <div className="gl-bulk-actions">
+          <Button variant="secondary" onClick={() => setConfirmShipAll(true)}>
+            一鍵標記全團已出貨
+          </Button>
+          <span className="helper-text">
+            會將此開團所有「已付款」訂單一次標記為已出貨並通知團員；其他狀態的訂單不受影響。
+          </span>
+        </div>
+      ) : (
+        <p className="helper-text" style={{ marginBottom: "1rem" }}>
+          想一次為整團出貨？請從「我的開團」進入該開團的訂單，或在網址帶上 group_buy_id 篩選後即可使用批次出貨。
+        </p>
+      )}
 
       <div className="group-buy-card-row" style={{ flexWrap: "wrap", marginBottom: "1rem" }}>
         {STATUS_TABS.map((tab) => (
@@ -151,6 +206,17 @@ export default function OrderListPage() {
           </div>
           <Pagination page={pagination.page} totalPages={pagination.total_pages} onPageChange={setPage} />
         </>
+      )}
+
+      {confirmShipAll && (
+        <ConfirmModal
+          title="一鍵標記全團已出貨"
+          message="將把此開團所有「已付款」訂單一次標記為已出貨，並通知每位團員。其他狀態的訂單不受影響。此操作無法復原，確定要繼續嗎？"
+          confirmLabel="確定出貨"
+          loading={shippingAll}
+          onCancel={() => setConfirmShipAll(false)}
+          onConfirm={handleShipAll}
+        />
       )}
     </>
   );

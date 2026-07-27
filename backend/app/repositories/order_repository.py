@@ -1,12 +1,12 @@
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, or_, select, text
 from sqlalchemy.orm import Session
 
 from app.models.enums import CancellationStatus, OrderStatus
 from app.models.group_buy import GroupBuy
-from app.models.order import CancellationRequest, GroupOrder, OrderItem
+from app.models.order import CancellationRequest, GroupOrder, OrderItem, OrderStatusHistory
 from app.models.user import AppUser
 
 _NON_OCCUPYING_STATUSES = ("cancelled", "rejected")
@@ -52,12 +52,25 @@ def order_number_exists(db: Session, order_number: str) -> bool:
 
 
 def generate_unique_order_number(db: Session) -> str:
-    date_part = datetime.now(timezone.utc).strftime("%Y%m%d")
-    for _ in range(5):
-        candidate = f"WG-{date_part}-{uuid.uuid4().hex[:6].upper()}"
-        if not order_number_exists(db, candidate):
-            return candidate
-    raise RuntimeError("無法產生唯一訂單編號，請重試。")
+    """產生每日流水的訂單編號，格式為 WG{YYMMDD}-{6 位流水}，例如 WG260727-000001。
+
+    以單一原子語句對 order_number_counter 取號（INSERT ... ON CONFLICT DO UPDATE
+    ... RETURNING），同一天內遞增、隔天自動從 1 重新開始；併發下單不會拿到相同號碼。
+    """
+    date_key = datetime.now(timezone.utc).strftime("%y%m%d")
+    serial = db.execute(
+        text(
+            """
+            INSERT INTO order_number_counter (date_key, last_value)
+            VALUES (:date_key, 1)
+            ON CONFLICT (date_key)
+            DO UPDATE SET last_value = order_number_counter.last_value + 1
+            RETURNING last_value
+            """
+        ),
+        {"date_key": date_key},
+    ).scalar_one()
+    return f"WG{date_key}-{serial:06d}"
 
 
 def create_order(db: Session, **fields) -> GroupOrder:
@@ -65,6 +78,28 @@ def create_order(db: Session, **fields) -> GroupOrder:
     db.add(order)
     db.flush()
     return order
+
+
+def create_status_history(
+    db: Session, order_id: uuid.UUID, status: OrderStatus, note: str | None = None
+) -> OrderStatusHistory:
+    """記錄一次訂單狀態異動（圖 08 右側「狀態紀錄」用）。
+
+    刻意不 flush：呼叫端（例如 reject_order）會在轉換後才補上 rejection_reason，
+    提前 flush 會讓 group_order 的 UPDATE 先送出而違反 rejection_reason 成對約束。
+    """
+    entry = OrderStatusHistory(order_id=order_id, status=status, note=note)
+    db.add(entry)
+    return entry
+
+
+def list_status_history(db: Session, order_id: uuid.UUID) -> list[OrderStatusHistory]:
+    stmt = (
+        select(OrderStatusHistory)
+        .where(OrderStatusHistory.order_id == order_id)
+        .order_by(OrderStatusHistory.created_at.asc())
+    )
+    return db.execute(stmt).scalars().all()
 
 
 def create_order_item(db: Session, **fields) -> OrderItem:
@@ -108,6 +143,31 @@ def list_by_user(
         .all()
     )
     return items, total
+
+
+def list_by_group_buy_and_status(
+    db: Session, group_buy_id: uuid.UUID, status: OrderStatus, *, for_update: bool = False
+) -> list[GroupOrder]:
+    """取得單一開團中指定狀態的所有訂單（批次出貨用）。"""
+    stmt = (
+        select(GroupOrder)
+        .where(GroupOrder.group_buy_id == group_buy_id, GroupOrder.status == status)
+        .order_by(GroupOrder.created_at.asc())
+    )
+    if for_update:
+        stmt = stmt.with_for_update()
+    return db.execute(stmt).scalars().all()
+
+
+def count_by_group_buy_and_status(
+    db: Session, group_buy_id: uuid.UUID, status: OrderStatus
+) -> int:
+    stmt = (
+        select(func.count())
+        .select_from(GroupOrder)
+        .where(GroupOrder.group_buy_id == group_buy_id, GroupOrder.status == status)
+    )
+    return int(db.execute(stmt).scalar_one())
 
 
 def count_for_leader_by_status(

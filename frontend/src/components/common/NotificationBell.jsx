@@ -1,7 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext.jsx";
-import { getNotifications, getUnreadCount, markNotificationRead } from "../../api/notifications.js";
+import { useNotifications } from "../../context/NotificationContext.jsx";
+import {
+  getNotifications,
+  markAllNotificationsRead,
+  markNotificationRead,
+} from "../../api/notifications.js";
 import { BellIcon } from "./icons.jsx";
 
 function formatRelativeTime(isoString) {
@@ -17,22 +22,13 @@ function formatRelativeTime(isoString) {
 
 export default function NotificationBell() {
   const { token } = useAuth();
+  // 未讀數改由 NotificationContext 共用，通知中心頁標記已讀後這裡會即時同步
+  const { unreadCount, refresh: refreshUnreadCount } = useNotifications();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(0);
   const [items, setItems] = useState(null);
+  const [markingAll, setMarkingAll] = useState(false);
   const containerRef = useRef(null);
-
-  function loadUnreadCount() {
-    getUnreadCount(token)
-      .then((response) => setUnreadCount(response.data.unread_count))
-      .catch(() => setUnreadCount(0));
-  }
-
-  useEffect(() => {
-    loadUnreadCount();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -62,12 +58,25 @@ export default function NotificationBell() {
     if (!notification.is_read) {
       try {
         await markNotificationRead(notification.id, token);
-        loadUnreadCount();
+        await refreshUnreadCount();
       } catch {
         // 非關鍵操作，失敗不影響導頁
       }
     }
     navigate(notification.target_url || "/notifications");
+  }
+
+  async function handleMarkAllRead() {
+    setMarkingAll(true);
+    try {
+      await markAllNotificationsRead(token);
+      setItems((prev) => (prev ? prev.map((item) => ({ ...item, is_read: true })) : prev));
+      await refreshUnreadCount();
+    } catch {
+      // 非關鍵操作，失敗時保持原狀
+    } finally {
+      setMarkingAll(false);
+    }
   }
 
   return (
@@ -85,7 +94,17 @@ export default function NotificationBell() {
       </button>
       {open && (
         <div className="notification-bell-dropdown" role="menu">
-          <div className="notification-bell-header">通知</div>
+          <div className="notification-bell-header">
+            <span>通知</span>
+            <button
+              type="button"
+              className="notification-bell-mark-all"
+              disabled={markingAll || unreadCount === 0}
+              onClick={handleMarkAllRead}
+            >
+              {markingAll ? "處理中…" : "全部標記為已讀"}
+            </button>
+          </div>
           {items === null ? (
             <div className="notification-bell-empty">載入中...</div>
           ) : items.length === 0 ? (

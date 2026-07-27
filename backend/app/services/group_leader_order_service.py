@@ -157,6 +157,7 @@ def _transition(
     *,
     from_status: OrderStatus,
     to_status: OrderStatus,
+    note: str | None = None,
 ) -> GroupOrder:
     order = _load_owned_order(db, profile, order_id, for_update=True)
     if order.status != from_status:
@@ -167,6 +168,7 @@ def _transition(
             {"current_status": order.status.value},
         )
     order.status = to_status
+    order_repository.create_status_history(db, order.id, to_status, note)
     return order
 
 
@@ -205,6 +207,7 @@ def reject_order(
         order_id,
         from_status=OrderStatus.PENDING_CONFIRMATION,
         to_status=OrderStatus.REJECTED,
+        note=normalized_reason,
     )
     order.rejection_reason = normalized_reason
     notification_service.notify_order_event(
@@ -232,9 +235,57 @@ def mark_shipped(db: Session, profile: GroupLeaderProfile, order_id: uuid.UUID) 
     order = _transition(
         db, profile, order_id, from_status=OrderStatus.PAID, to_status=OrderStatus.SHIPPED
     )
+    notification_service.notify_order_event(
+        db,
+        user_id=order.user_id,
+        order_id=order.id,
+        title="訂單已出貨",
+        message=f"你的訂單 {order.order_number} 已由團主出貨，收到商品後請與團主確認完成。",
+    )
     db.commit()
     db.refresh(order)
     return order
+
+
+def mark_all_shipped(
+    db: Session, profile: GroupLeaderProfile, group_buy_id: uuid.UUID
+) -> dict:
+    """一鍵將指定開團中所有「已付款」訂單標記為已出貨。
+
+    只處理 paid 狀態的訂單；其餘狀態（待確認、待付款、已出貨、已完成、已拒絕、已取消）
+    一律略過，並在回應中回報略過筆數，讓團主知道還有多少張沒進到可出貨狀態。
+    """
+    group_buy = group_buy_repository.get_by_id(db, group_buy_id)
+    if group_buy is None or group_buy.group_leader_profile_id != profile.id:
+        raise AppError(404, "GROUP_BUY_NOT_FOUND", "找不到指定的開團。")
+
+    orders = order_repository.list_by_group_buy_and_status(
+        db, group_buy_id, OrderStatus.PAID, for_update=True
+    )
+    pending_confirmation = order_repository.count_by_group_buy_and_status(
+        db, group_buy_id, OrderStatus.PENDING_CONFIRMATION
+    )
+    pending_payment = order_repository.count_by_group_buy_and_status(
+        db, group_buy_id, OrderStatus.PENDING_PAYMENT
+    )
+
+    for order in orders:
+        order.status = OrderStatus.SHIPPED
+        order_repository.create_status_history(db, order.id, OrderStatus.SHIPPED)
+        notification_service.notify_order_event(
+            db,
+            user_id=order.user_id,
+            order_id=order.id,
+            title="訂單已出貨",
+            message=f"你的訂單 {order.order_number} 已由團主出貨，收到商品後請與團主確認完成。",
+        )
+
+    db.commit()
+    return {
+        "shipped_count": len(orders),
+        "skipped_pending_confirmation": pending_confirmation,
+        "skipped_pending_payment": pending_payment,
+    }
 
 
 def complete_order(db: Session, profile: GroupLeaderProfile, order_id: uuid.UUID) -> GroupOrder:
@@ -274,6 +325,9 @@ def approve_cancellation(
     request.response_note = normalize_optional_text(response_note)
     request.processed_at = now
     order.status = OrderStatus.CANCELLED
+    order_repository.create_status_history(
+        db, order.id, OrderStatus.CANCELLED, request.response_note
+    )
 
     notification_service.notify_order_event(
         db,

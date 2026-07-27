@@ -49,6 +49,16 @@ def get_unread_count(db: Session, user_id: uuid.UUID) -> int:
     return db.execute(stmt).scalar_one()
 
 
+def count_by_type(db: Session, user_id: uuid.UUID) -> dict[str, int]:
+    """回傳各通知類型的總筆數（圖 10 右側「通知摘要」用）。"""
+    stmt = (
+        select(Notification.notification_type, func.count())
+        .where(Notification.user_id == user_id)
+        .group_by(Notification.notification_type)
+    )
+    return {row[0].value: row[1] for row in db.execute(stmt).all()}
+
+
 def mark_read(db: Session, notification: Notification) -> None:
     """依 Business Rules §26.3：重複標記已讀不更新原 read_at。"""
     if not notification.is_read:

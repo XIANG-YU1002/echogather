@@ -52,12 +52,21 @@ class CancellationRequestSummary(BaseModel):
     created_at: UTCDateTime
 
 
+class OrderStatusHistoryItem(BaseModel):
+    """訂單狀態異動紀錄（圖 08 右側「狀態紀錄」）。"""
+
+    status: OrderStatus
+    note: str | None = None
+    created_at: UTCDateTime
+
+
 class OrderDetailResponse(BaseModel):
     id: uuid.UUID
     order_number: str
     status: OrderStatus
     rejection_reason: str | None
     product_total_amount: Money
+    group_leader_id: uuid.UUID
     group_leader_name: str
     activity_name: str
     payment_method: PaymentMethod
@@ -67,7 +76,14 @@ class OrderDetailResponse(BaseModel):
     rules: str
     contact_platform: ContactPlatform
     contact_value: str
+    # 收單期限取自開團的即時值（訂單未快照，團主延期時會一併更新）
+    deadline_at: UTCDateTime
+    # 下單當時保存的會員聯絡方式快照
+    member_facebook_contact: str | None = None
+    member_discord_contact: str | None = None
+    member_line_contact: str | None = None
     items: list[OrderItemDetail]
+    status_history: list[OrderStatusHistoryItem] = []
     pending_cancellation_request: CancellationRequestSummary | None
     cancellation_requests: list[CancellationRequestSummary]
     created_at: UTCDateTime

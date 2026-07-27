@@ -1982,7 +1982,7 @@ Success：
 {
   "data": {
     "id": "uuid",
-    "order_number": "WG-20260801-A1B2C3",
+    "order_number": "WG260801-000001",
     "status": "pending_confirmation",
     "product_total_amount": "1170.00",
     "created_at": "2026-08-01T03:00:00Z"
@@ -2032,7 +2032,7 @@ Response Item：
 ```json
 {
   "id": "uuid",
-  "order_number": "WG-20260801-A1B2C3",
+  "order_number": "WG260801-000001",
   "group_leader_name": "月影團",
   "activity_name": "3.4 官方周邊",
   "representative_image_url": "https://<project-ref>.supabase.co/storage/v1/object/public/media/product/2026/08/product.webp",
@@ -2066,7 +2066,10 @@ Response 包含：
 - 不可修改的拒絕原因
 - 商品總額
 - 團主、活動、付款方式、團規及聯絡快照
+- 下單當時的會員聯絡方式快照
+- 收單期限（取自開團即時值）
 - 商品明細
+- 狀態異動歷史
 - 所有取消申請歷史
 - 目前待處理取消申請
 
@@ -2074,10 +2077,11 @@ Response 包含：
 {
   "data": {
     "id": "uuid",
-    "order_number": "WG-20260801-A1B2C3",
+    "order_number": "WG260801-000001",
     "status": "pending_payment",
     "rejection_reason": null,
     "product_total_amount": "1170.00",
+    "group_leader_id": "uuid",
     "group_leader_name": "月影團",
     "activity_name": "3.4 官方周邊",
     "payment_method": "bank_transfer",
@@ -2085,7 +2089,25 @@ Response 包含：
     "requires_second_payment": false,
     "includes_full_gift": true,
     "rules": "下單時完整團規",
+    "contact_platform": "discord",
+    "contact_value": "moon_group",
+    "deadline_at": "2026-08-10T15:59:00Z",
+    "member_facebook_contact": null,
+    "member_discord_contact": "member_discord",
+    "member_line_contact": "@member_line",
     "items": [],
+    "status_history": [
+      {
+        "status": "pending_confirmation",
+        "note": null,
+        "created_at": "2026-08-01T03:00:00Z"
+      },
+      {
+        "status": "pending_payment",
+        "note": null,
+        "created_at": "2026-08-01T05:00:00Z"
+      }
+    ],
     "pending_cancellation_request": null,
     "cancellation_requests": [],
     "created_at": "2026-08-01T03:00:00Z",
@@ -2093,6 +2115,16 @@ Response 包含：
   }
 }
 ```
+
+`group_leader_id` 供前端連往團主公開頁。
+
+`deadline_at` 取自開團本體（`group_buy.deadline_at`），**非下單當時快照**；
+依使用者決議採即時值，團主延期後訂單頁會一併更新。
+
+`member_*_contact` 為下單當時保存的聯絡方式快照，後續修改個人資料不影響本訂單。
+
+`status_history` 依 `created_at` 由舊到新排序，訂單建立時即寫入第一筆
+`pending_confirmation`；`note` 於拒絕時存拒絕原因、取消核准時存團主回覆。
 
 商品總額不包含二補、國際運費、國內運費及其他後續費用。
 
@@ -2181,11 +2213,19 @@ Response Item：
     "id": "uuid"
   },
   "target_url": "/group-leaders/group_leader_uuid",
+  "actor_name": "月影團",
+  "actor_avatar_url": "https://<project-ref>.supabase.co/storage/v1/object/public/media/avatar/2026/08/xxx.webp",
   "created_at": "2026-08-05T03:00:00Z"
 }
 ```
 
 點擊通知時由 `target_url` 導向相關訂單、團主頁、開團頁或團主申請結果。
+
+`actor_name` / `actor_avatar_url` 為**團主公告**的發布團主名稱與頭像（依圖 10 於通知
+列表顯示團主頭像）。平台公告與系統通知皆為 `null`。
+
+訂單通知的 `target_url` 會依收件人判斷：收件人為下單會員時導向 `/orders/{id}`，
+收件人為該團團主時導向 `/group-leader/orders/{id}`。
 
 團主公告導向規則：
 
@@ -2201,6 +2241,31 @@ Response Item：
 ```http
 GET /api/v1/notifications/unread-count
 ```
+
+供 Header 鈴鐺顯示紅點數量。
+
+---
+
+# 20.2b Get Notification Summary
+
+```http
+GET /api/v1/notifications/summary
+```
+
+供圖 10 通知中心右側「通知摘要」卡使用。
+
+```json
+{
+  "data": {
+    "unread_count": 3,
+    "system_count": 3,
+    "group_leader_count": 3
+  }
+}
+```
+
+`unread_count` 為未讀總數；`system_count` 與 `group_leader_count` 為該類型的
+**總筆數（含已讀）**，依使用者決議採此定義。
 
 ---
 
@@ -3773,6 +3838,7 @@ GET    /orders/{order_id}
 POST   /orders/{order_id}/cancellation-requests
 GET    /notifications
 GET    /notifications/unread-count
+GET    /notifications/summary
 PATCH  /notifications/{notification_id}/read
 PATCH  /notifications/read-all
 ```

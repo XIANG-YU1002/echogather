@@ -23,6 +23,10 @@ EXPECTED_TABLES = {
     "follow_list_item",
     "group_order",
     "order_item",
+    # migration 0005_order_status_history 新增：訂單狀態異動歷史
+    "order_status_history",
+    # migration 0006_order_number_serial 新增：訂單編號每日流水計數器
+    "order_number_counter",
     "cancellation_request",
     "product_favorite",
     "announcement",
@@ -31,9 +35,10 @@ EXPECTED_TABLES = {
 
 
 def test_all_tables_registered():
-    """規格 18 張表，加上 migration 0003 新增的 group_buy_product_character 共 19 張。"""
+    """規格 18 張表，加上 0003 的 group_buy_product_character、0005 的
+    order_status_history 與 0006 的 order_number_counter，共 21 張。"""
     assert set(Base.metadata.tables.keys()) == EXPECTED_TABLES
-    assert len(EXPECTED_TABLES) == 19
+    assert len(EXPECTED_TABLES) == 21
 
 
 def test_app_user_contact_columns_nullable_and_required_by_check_constraint():

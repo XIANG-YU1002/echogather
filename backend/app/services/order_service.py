@@ -21,8 +21,9 @@ from app.schemas.order import (
     OrderDetailResponse,
     OrderItemDetail,
     OrderListItem,
+    OrderStatusHistoryItem,
 )
-from app.services import availability_service
+from app.services import availability_service, notification_service
 
 
 def create_order(db: Session, user: AppUser, rules_accepted: bool) -> CreateOrderResponse:
@@ -119,6 +120,16 @@ def create_order(db: Session, user: AppUser, rules_accepted: bool) -> CreateOrde
         member_facebook_contact_snapshot=user.facebook_contact,
         member_discord_contact_snapshot=user.discord_contact,
         member_line_contact_snapshot=user.line_contact,
+    )
+    order_repository.create_status_history(db, order.id, OrderStatus.PENDING_CONFIRMATION)
+
+    # 通知團主有新訂單待確認
+    notification_service.notify_order_event(
+        db,
+        user_id=leader_profile.user_id,
+        order_id=order.id,
+        title="收到新訂單",
+        message=f"會員 {user.nickname} 送出訂單 {order.order_number}，請盡快確認。",
     )
 
     for item, group_buy_product, product in resolved:
@@ -225,6 +236,9 @@ def get_my_order_detail(db: Session, user: AppUser, order_id: uuid.UUID) -> Orde
     pending = next(
         (r for r in cancellation_requests if r.status == CancellationStatus.PENDING), None
     )
+    status_history = order_repository.list_status_history(db, order.id)
+    # 收單期限與團主公開頁連結取自開團本體（訂單未快照收單期限，依使用者決議取即時值）
+    group_buy = group_buy_repository.get_by_id(db, order.group_buy_id)
 
     return OrderDetailResponse(
         id=order.id,
@@ -232,6 +246,15 @@ def get_my_order_detail(db: Session, user: AppUser, order_id: uuid.UUID) -> Orde
         status=order.status,
         rejection_reason=order.rejection_reason,
         product_total_amount=order.product_total_amount,
+        group_leader_id=group_buy.group_leader_profile_id,
+        deadline_at=group_buy.deadline_at,
+        member_facebook_contact=order.member_facebook_contact_snapshot,
+        member_discord_contact=order.member_discord_contact_snapshot,
+        member_line_contact=order.member_line_contact_snapshot,
+        status_history=[
+            OrderStatusHistoryItem(status=h.status, note=h.note, created_at=h.created_at)
+            for h in status_history
+        ],
         group_leader_name=order.group_leader_name_snapshot,
         activity_name=order.activity_name_snapshot,
         payment_method=order.payment_method_snapshot,

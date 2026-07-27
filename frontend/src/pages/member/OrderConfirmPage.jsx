@@ -4,6 +4,7 @@ import { getFollowList } from "../../api/followList.js";
 import { getMyProfile } from "../../api/users.js";
 import { createOrder } from "../../api/orders.js";
 import { useAuth } from "../../context/AuthContext.jsx";
+import { useCart } from "../../context/CartContext.jsx";
 import { ApiError } from "../../api/client.js";
 import Alert from "../../components/common/Alert.jsx";
 import Breadcrumb from "../../components/common/Breadcrumb.jsx";
@@ -62,6 +63,7 @@ function PageHead() {
 
 export default function OrderConfirmPage() {
   const { token } = useAuth();
+  const { refresh: refreshCart } = useCart();
   const navigate = useNavigate();
 
   const [followList, setFollowList] = useState(undefined);
@@ -92,6 +94,9 @@ export default function OrderConfirmPage() {
     setSubmitError(null);
     try {
       const response = await createOrder(true, token);
+      // 後端下單成功後會刪除跟團清單，這裡同步更新 Header 的購物車數量，
+      // 否則紅點會殘留到下次重新整理。
+      await refreshCart();
       navigate(`/orders/${response.data.id}`, { replace: true });
     } catch (err) {
       if (err instanceof ApiError) {
