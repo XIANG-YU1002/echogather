@@ -1,6 +1,15 @@
+import uuid
+
 from app.models.enums import UserRole
 from tests.factories import create_activity, create_character, create_product, create_user
 from tests.utils import auth_headers, login
+
+# 測試跑在與示範資料共用的 Supabase 上，角色名有不分大小寫的唯一鍵
+# （uq_character_name_lower），因此一律使用隨機名稱避免與既有資料撞名。
+
+
+def _unique_name(prefix: str = "測試角色") -> str:
+    return f"{prefix}-{uuid.uuid4().hex[:8]}"
 
 
 def _admin_headers(client, db_session):
@@ -11,7 +20,9 @@ def _admin_headers(client, db_session):
 def test_create_product_with_existing_and_new_character(client, db_session):
     headers = _admin_headers(client, db_session)
     activity = create_activity(db_session)
-    existing_character = create_character(db_session, name="今汐")
+    existing_name = _unique_name()
+    new_name = _unique_name()
+    existing_character = create_character(db_session, name=existing_name)
 
     response = client.post(
         "/api/v1/admin/products",
@@ -20,7 +31,7 @@ def test_create_product_with_existing_and_new_character(client, db_session):
             "name": "壓克力立牌",
             "official_price": "390.00",
             "primary_image_url": "/uploads/product/p.webp",
-            "characters": [{"id": str(existing_character.id)}, {"new_name": "長離"}],
+            "characters": [{"id": str(existing_character.id)}, {"new_name": new_name}],
         },
         headers=headers,
     )
@@ -29,7 +40,7 @@ def test_create_product_with_existing_and_new_character(client, db_session):
     data = response.json()["data"]
     assert data["official_price"] == "390.00"
     names = {c["name"] for c in data["characters"]}
-    assert names == {"今汐", "長離"}
+    assert names == {existing_name, new_name}
 
 
 def test_create_product_duplicate_name_in_activity(client, db_session):
@@ -51,9 +62,12 @@ def test_create_product_duplicate_name_in_activity(client, db_session):
 
 
 def test_create_product_new_character_reuses_existing_case_insensitive(client, db_session):
+    """以 new_name 送出已存在的角色（大小寫不同）時應重用既有角色，不建立第二筆。"""
     headers = _admin_headers(client, db_session)
     activity = create_activity(db_session)
-    create_character(db_session, name="今汐")
+    suffix = uuid.uuid4().hex[:8]
+    existing_name = f"Jinhsi{suffix}"
+    create_character(db_session, name=existing_name)
 
     response = client.post(
         "/api/v1/admin/products",
@@ -61,18 +75,19 @@ def test_create_product_new_character_reuses_existing_case_insensitive(client, d
             "activity_id": str(activity.id),
             "name": "商品A",
             "primary_image_url": "/uploads/product/p.webp",
-            "characters": [{"new_name": "今汐"}],
+            "characters": [{"new_name": f"JINHSI{suffix.upper()}"}],
         },
         headers=headers,
     )
     assert response.status_code == 201
     assert len(response.json()["data"]["characters"]) == 1
 
-    # only one character named 今汐 should exist afterward
+    # 以隨機片段查詢，確認沒有因大小寫差異多建立一筆角色
     suggestions = client.get(
-        "/api/v1/admin/characters/suggestions", params={"q": "今汐"}, headers=headers
+        "/api/v1/admin/characters/suggestions", params={"q": suffix}, headers=headers
     ).json()["data"]
     assert len(suggestions) == 1
+    assert suggestions[0]["name"] == existing_name
     assert suggestions[0]["related_product_count"] == 1
 
 

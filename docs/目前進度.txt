@@ -1239,3 +1239,84 @@ formatOrderDateTime。圖 08 OrderDetailPage 改為引用（畫面輸出不變�
   NotificationsPage 在單則已讀與全部已讀後 await refreshUnreadCount()。
 - 現在四個入口改變已讀狀態都會即時同步紅點：鈴鐺面板點單則／鈴鐺面板全部已讀／
   通知中心頁點單則／通知中心頁全部已讀。
+
+
+--------------------------------------------------------------------------------
+第 3 批續 6：修正共用資料庫造成的測試失敗 ＋ GitHub Pages 前端部署設定
+--------------------------------------------------------------------------------
+記錄時間：2026-07-27
+
+--- 1. 修正「A 類：共用正式資料庫」造成的 7 個測試失敗 ---
+【使用者裁決】「哪個比較合適就選那個」→ 選擇修測試，不另建獨立測試資料庫。
+理由：獨立測試庫要另開 Supabase 專案或裝本機 PostgreSQL、改 conftest、在新庫跑完
+所有 migration、之後維護兩套環境，對一人專案成本過高；而這些測試本身寫得不夠嚴謹
+（寫死角色名、寫死絕對數量），改掉後不論資料庫內容為何都會正確，這是測試本來就
+該具備的性質。測試早已跑在交易內最後 rollback，唯一問題是撞上已 commit 的示範資料。
+
+修正內容：
+- test_admin_character_api.py（3 個）：角色名改用 _unique_name() 隨機產生；
+  test_get_suggestions 改以該隨機名作為查詢關鍵字，確保只命中本測試建立的資料。
+  另外 test_create_character_duplicate_case_insensitive 原本用「今汐」對「今汐」，
+  中文沒有大小寫，其實測不到 lower() 唯一鍵；改用 Jinhsi{suffix} 對
+  JINHSI{SUFFIX}，才真正驗證到不分大小寫去重。
+- test_admin_product_api.py（2 個）：同上改隨機角色名；
+  reuses_existing_case_insensitive 同樣改為英文名以真正測到大小寫。
+- test_public_content_api.py::test_global_search_preview：關鍵字改為隨機片段，
+  斷言由 >= 1 收緊為 == 1（確定搜到的就是本測試建立的資料）。
+- test_admin_dashboard_api.py::test_dashboard_counts：儀表板統計全資料庫，
+  改為比對「新增資料前後的增量 +1」而非絕對值 == 1，順便驗證每張卡確實只對應
+  到該類型的資料。
+
+上一批已修：test_admin_announcement_api 的 recipient_count 寫死斷言
+（改為對照 AppUser 實際筆數）。至此 A 類 8 個失敗全部處理完畢。
+
+【測試狀態（重要，未完整驗證）】
+- 4 個修正檔案單獨跑：37 passed。
+- 完整 pytest（168 個）本次只跑到 58%（102 個）就先 commit，該階段 0 失敗。
+  已跑完且通過的檔案：test_admin_activity_api、test_admin_announcement_api、
+  test_admin_character_api、test_admin_dashboard_api、
+  test_admin_group_leader_application_api、test_admin_product_api、test_auth_api、
+  test_favorite_api、test_follow_list_api、test_group_leader_announcement_api、
+  test_group_leader_application_api、test_group_leader_group_buy_api、
+  test_group_leader_order_api。
+  尚未跑到：test_health、test_models_metadata、test_notification_api、
+  test_order_api、test_public_content_api、test_upload_api、test_users_api。
+  → 下次有機會請補跑完整套確認。完整跑一次約需 15 分鐘（每個測試都要連
+    ap-south-1 的 Supabase，延遲高）。
+
+--- 2. GitHub Pages 前端部署設定 ---
+【使用者裁決】路線 A：前端放 GitHub Pages（目前只為了看畫面），
+後端與前後端整合後續另外處理。
+
+- frontend/vite.config.js：改為函式形式，build 時 base = "/WuWaGroup/"
+  （GitHub Pages 網址多一層 repo 路徑，不設會導致 JS/CSS 全部 404），
+  dev 維持 "/" 以免本機要打 localhost:5173/WuWaGroup/。
+- frontend/src/App.jsx：BrowserRouter 加 basename={import.meta.env.BASE_URL}，
+  否則部署後所有前端路由都對不上。
+- frontend/src/api/client.js：VITE_API_BASE_URL 加安全預設值。
+  原本沒設時 new URL(undefined) 會在模組載入就丟例外，導致整個 App 白屏。
+- .github/workflows/deploy-frontend.yml：push 到 main 且動到 frontend/ 時自動
+  build 並發布到 Pages；含 workflow_dispatch 可手動觸發。
+  build 後 cp dist/index.html dist/404.html 作為 SPA fallback
+  （Pages 是純靜態主機，直接開 /orders 會回 404）。
+  VITE_API_BASE_URL 讀 repo 的 Actions Variables，後端上線後只需設變數不必改碼。
+
+【使用者需自行操作（我沒有 GitHub 權限）】
+1. Settings → Pages → Source 選「GitHub Actions」（要先做，否則首次部署會失敗）
+2. git push
+3. 網站將位於 https://xiang-yu1002.github.io/WuWaGroup/
+
+【已知限制：沒有後端時幾乎看不到畫面】
+- 登入頁／註冊頁：樣式完整可看（載入時不打 API）
+- 首頁：框架可看，活動列表顯示載入失敗
+- 其他公開頁：載入失敗
+- 會員區／團主後台／管理員後台：需登入，一律導回登入頁
+→ 圖 06–10 這些做好的頁面在純前端部署下一個都看不到。要真的能看必須也部署後端
+  （Supabase 已在雲端，後端只需一台機器跑 FastAPI；Render 免費方案可行，
+  但會閒置休眠，首次開啟需等 30~50 秒喚醒）。
+
+--- 3. 本機驗證 ---
+- npm run build 通過（131 modules），dist/index.html 的資源路徑正確為
+  /WuWaGroup/assets/...
+- dev 模式不受影響，資源路徑仍為 /src/main.jsx，localhost:5173 與
+  localhost:5173/orders 皆回 200。

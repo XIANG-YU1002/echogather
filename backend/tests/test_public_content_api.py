@@ -248,17 +248,25 @@ def test_public_group_leader_group_buys_and_announcements(client, db_session):
 
 
 def test_global_search_preview(client, db_session):
-    activity = create_activity(db_session, name="今汐周邊活動")
-    create_product(db_session, activity=activity, name="今汐壓克力立牌")
-    create_character(db_session, name="今汐")
+    """活動／商品／角色三種結果都要能被同一個關鍵字搜到。
 
-    response = client.get("/api/v1/search", params={"q": "今汐"})
+    角色名有不分大小寫的唯一鍵，且測試與示範資料共用資料庫，
+    因此關鍵字使用隨機片段，既避免撞名也確保搜到的就是本測試建立的資料。
+    """
+    import uuid
+
+    keyword = f"搜尋測試{uuid.uuid4().hex[:8]}"
+    activity = create_activity(db_session, name=f"{keyword}周邊活動")
+    create_product(db_session, activity=activity, name=f"{keyword}壓克力立牌")
+    create_character(db_session, name=keyword)
+
+    response = client.get("/api/v1/search", params={"q": keyword})
 
     assert response.status_code == 200
     data = response.json()["data"]
-    assert data["activities"]["total_count"] >= 1
-    assert data["products"]["total_count"] >= 1
-    assert data["characters"]["total_count"] >= 1
+    assert data["activities"]["total_count"] == 1
+    assert data["products"]["total_count"] == 1
+    assert data["characters"]["total_count"] == 1
 
 
 def test_global_search_requires_query(client):

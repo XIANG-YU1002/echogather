@@ -1,4 +1,6 @@
-const BASE_URL = import.meta.env.VITE_API_BASE_URL;
+// 沒帶 VITE_API_BASE_URL 時退回本機後端。
+// 不給預設值的話，下一行的 new URL() 會在模組載入時就丟例外，整個 App 白屏。
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api/v1";
 const API_ORIGIN = new URL(BASE_URL).origin;
 
 export function resolveMediaUrl(path) {
