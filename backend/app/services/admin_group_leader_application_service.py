@@ -34,6 +34,7 @@ def _to_list_item(db: Session, application: GroupLeaderApplication) -> Applicati
         id=application.id,
         user=ApplicationUserRef.model_validate(user, from_attributes=True),
         status=application.status,
+        reason=application.reason,
         reviewed_at=application.reviewed_at,
         created_at=application.created_at,
     )
@@ -62,6 +63,7 @@ def get_application_detail(
         id=application.id,
         user=ApplicationUserRef.model_validate(user, from_attributes=True),
         status=application.status,
+        reason=application.reason,
         reviewed_by=application.reviewed_by_user_id,
         reviewed_at=application.reviewed_at,
         created_at=application.created_at,

@@ -19,6 +19,7 @@ class GroupBuySortOption(str, Enum):
 class GroupBuyActivitySummary(BaseModel):
     id: uuid.UUID
     name: str
+    image_url: str
     status: ActivityStatus
     has_full_gift: bool = False
 

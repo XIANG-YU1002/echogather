@@ -31,6 +31,8 @@ class GroupLeaderApplication(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         nullable=False,
         server_default=text(f"'{GroupLeaderApplicationStatus.PENDING.value}'"),
     )
+    # 申請原因為選填（依使用者需求新增），供管理員審核時參考
+    reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     reviewed_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("app_user.id", ondelete="RESTRICT"), nullable=True
     )

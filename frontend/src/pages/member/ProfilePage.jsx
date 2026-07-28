@@ -1,23 +1,52 @@
 import { useEffect, useRef, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { getMyProfile, updateMyContacts, updateMyProfile } from "../../api/users.js";
 import { uploadImage } from "../../api/uploads.js";
-import { resolveMediaUrl } from "../../api/client.js";
+import { ApiError, resolveMediaUrl } from "../../api/client.js";
 import { useAuth } from "../../context/AuthContext.jsx";
 import Alert from "../../components/common/Alert.jsx";
+import Breadcrumb from "../../components/common/Breadcrumb.jsx";
 import Button from "../../components/common/Button.jsx";
 import ErrorState from "../../components/common/ErrorState.jsx";
-import FormField from "../../components/common/FormField.jsx";
 import PageLoader from "../../components/common/PageLoader.jsx";
+import {
+  CameraIcon,
+  DiscordIcon,
+  FacebookIcon,
+  LineIcon,
+  SaveIcon,
+  UploadIcon,
+} from "../../components/common/icons.jsx";
+
+const CONTACT_FIELDS = [
+  { key: "facebook", label: "Facebook", icon: FacebookIcon, placeholder: "請輸入 Facebook 連結" },
+  { key: "discord", label: "Discord", icon: DiscordIcon, placeholder: "username#1234" },
+  { key: "line", label: "LINE", icon: LineIcon, placeholder: "@your_line_id" },
+];
+
+/** 後端同一欄位可能回多筆訊息，全部逐行列出。 */
+function FieldError({ error }) {
+  if (!error) return null;
+  const messages = Array.isArray(error) ? error : [error];
+  return (
+    <span className="auth-error">
+      {messages.map((message) => (
+        <span key={message} className="auth-error-line">
+          {message}
+        </span>
+      ))}
+    </span>
+  );
+}
 
 export default function ProfilePage() {
   const { token, refreshSession } = useAuth();
+  const location = useLocation();
   const [profile, setProfile] = useState(null);
   const [error, setError] = useState(false);
 
   const [nickname, setNickname] = useState("");
-  const [facebookContact, setFacebookContact] = useState("");
-  const [discordContact, setDiscordContact] = useState("");
-  const [lineContact, setLineContact] = useState("");
+  const [contacts, setContacts] = useState({ facebook: "", discord: "", line: "" });
 
   const [avatarUrl, setAvatarUrl] = useState(null);
   const [uploading, setUploading] = useState(false);
@@ -25,6 +54,14 @@ export default function ProfilePage() {
 
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState(null);
+  const [fieldErrors, setFieldErrors] = useState({});
+
+  // 註冊時頭像上傳失敗會導向本頁並帶入提示
+  useEffect(() => {
+    if (location.state?.message) {
+      setFeedback({ type: "info", message: location.state.message });
+    }
+  }, [location.state]);
 
   function load() {
     setError(false);
@@ -34,9 +71,11 @@ export default function ProfilePage() {
         const data = response.data;
         setProfile(data);
         setNickname(data.nickname);
-        setFacebookContact(data.facebook_contact ?? "");
-        setDiscordContact(data.discord_contact ?? "");
-        setLineContact(data.line_contact ?? "");
+        setContacts({
+          facebook: data.facebook_contact ?? "",
+          discord: data.discord_contact ?? "",
+          line: data.line_contact ?? "",
+        });
         setAvatarUrl(data.avatar_url);
       })
       .catch(() => setError(true));
@@ -47,13 +86,19 @@ export default function ProfilePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  function updateContact(key, value) {
+    setContacts((previous) => ({ ...previous, [key]: value }));
+  }
+
   async function handleAvatarChange(event) {
     const file = event.target.files?.[0];
     if (!file) return;
     setUploading(true);
+    setFeedback(null);
     try {
       const response = await uploadImage(file, "avatar", token);
       setAvatarUrl(response.data.url);
+      setFeedback({ type: "info", message: "頭像已上傳，請按「儲存資料」完成套用。" });
     } catch {
       setFeedback({ type: "error", message: "頭像上傳失敗，請稍後再試。" });
     } finally {
@@ -66,13 +111,14 @@ export default function ProfilePage() {
     event.preventDefault();
     setSaving(true);
     setFeedback(null);
+    setFieldErrors({});
     try {
       await updateMyProfile({ nickname, avatar_url: avatarUrl }, token);
       await updateMyContacts(
         {
-          facebook_contact: facebookContact || null,
-          discord_contact: discordContact || null,
-          line_contact: lineContact || null,
+          facebook_contact: contacts.facebook || null,
+          discord_contact: contacts.discord || null,
+          line_contact: contacts.line || null,
         },
         token,
       );
@@ -80,7 +126,30 @@ export default function ProfilePage() {
       await refreshSession();
       load();
     } catch (err) {
-      setFeedback({ type: "error", message: err.message ?? "儲存時發生錯誤，請稍後再試。" });
+      // 欄位層級錯誤（例如 Facebook 連結格式）掛回對應欄位，
+      // 跨欄位錯誤（至少一項聯絡方式）提到頂端顯示
+      if (err instanceof ApiError && err.code === "VALIDATION_ERROR" && err.details?.fields) {
+        const flattened = {};
+        const generalMessages = [];
+        Object.entries(err.details.fields).forEach(([field, messages]) => {
+          if (field === "_") {
+            generalMessages.push(...messages);
+          } else {
+            flattened[field] = messages;
+          }
+        });
+        setFieldErrors(flattened);
+        setFeedback(
+          generalMessages.length > 0
+            ? { type: "error", message: generalMessages.join("　") }
+            : { type: "error", message: "輸入資料格式不正確，請檢查後再儲存。" },
+        );
+      } else {
+        setFeedback({
+          type: "error",
+          message: err?.message ?? "儲存時發生錯誤，請稍後再試。",
+        });
+      }
     } finally {
       setSaving(false);
     }
@@ -96,87 +165,114 @@ export default function ProfilePage() {
 
   return (
     <>
-      <div className="page-header">
-        <h1>個人資料與聯絡方式</h1>
-        <p className="helper-text">管理您的個人資料與聯絡方式，讓團主與其他成員能更方便地與您聯繫。</p>
-      </div>
+      <Breadcrumb items={[{ label: "首頁", to: "/" }, { label: "個人資料" }]} />
 
-      {feedback && <Alert type={feedback.type}>{feedback.message}</Alert>}
-
-      <form onSubmit={handleSave}>
-        <div className="group-buy-card-row" style={{ marginBottom: "1.5rem" }}>
-          {avatarUrl ? (
-            <img className="avatar-circle" style={{ width: "4.5rem", height: "4.5rem", fontSize: "1.5rem" }} src={resolveMediaUrl(avatarUrl)} alt="" />
-          ) : (
-            <span className="avatar-circle" style={{ width: "4.5rem", height: "4.5rem", fontSize: "1.5rem" }} aria-hidden="true">
-              {nickname?.[0]?.toUpperCase() ?? "?"}
-            </span>
-          )}
-          <div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              style={{ display: "none" }}
-              onChange={handleAvatarChange}
-            />
-            <Button
-              type="button"
-              variant="secondary"
-              loading={uploading}
-              onClick={() => fileInputRef.current?.click()}
-            >
-              更換頭像
-            </Button>
-          </div>
+      <div className="pf-panel">
+        <div className="pf-head">
+          <h1>個人資料與聯絡方式</h1>
+          <p>管理您的個人資料與聯絡方式，讓團主與其他成員能更方便地與您聯繫。</p>
         </div>
 
-        <FormField label="暱稱" htmlFor="profile-nickname" required>
-          <input
-            id="profile-nickname"
-            value={nickname}
-            onChange={(event) => setNickname(event.target.value)}
-            required
-          />
-        </FormField>
+        {feedback && <Alert type={feedback.type}>{feedback.message}</Alert>}
 
-        <FormField label="Email（不可修改）" htmlFor="profile-email">
-          <input id="profile-email" value={profile.email} disabled />
-        </FormField>
+        <form onSubmit={handleSave}>
+          <div className="pf-avatar-box">
+            <div className="pf-avatar-wrap">
+              {avatarUrl ? (
+                <img className="pf-avatar" src={resolveMediaUrl(avatarUrl)} alt="" />
+              ) : (
+                <span className="pf-avatar pf-avatar-fallback" aria-hidden="true">
+                  {nickname?.[0]?.toUpperCase() ?? "?"}
+                </span>
+              )}
+              <button
+                type="button"
+                className="pf-avatar-camera"
+                aria-label="更換頭像"
+                disabled={uploading}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <CameraIcon />
+              </button>
+            </div>
+            <div className="pf-avatar-text">
+              <h2>頭像</h2>
+              <p>上傳個人頭像，讓其他成員更容易認出您。</p>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="pf-avatar-input"
+                onChange={handleAvatarChange}
+              />
+              <Button
+                type="button"
+                variant="secondary"
+                loading={uploading}
+                className="pf-avatar-btn"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <UploadIcon />
+                更換頭像
+              </Button>
+            </div>
+          </div>
 
-        <FormField label="Facebook" htmlFor="profile-facebook">
-          <input
-            id="profile-facebook"
-            placeholder="請輸入 Facebook 連結"
-            value={facebookContact}
-            onChange={(event) => setFacebookContact(event.target.value)}
-          />
-        </FormField>
+          <div className="pf-row">
+            <label htmlFor="profile-nickname">暱稱</label>
+            <div className="pf-row-input">
+              <input
+                id="profile-nickname"
+                value={nickname}
+                onChange={(event) => setNickname(event.target.value)}
+                required
+              />
+              <FieldError error={fieldErrors.nickname} />
+            </div>
+          </div>
 
-        <FormField label="Discord" htmlFor="profile-discord">
-          <input
-            id="profile-discord"
-            placeholder="username#1234"
-            value={discordContact}
-            onChange={(event) => setDiscordContact(event.target.value)}
-          />
-        </FormField>
+          <div className="pf-row">
+            <label htmlFor="profile-email">
+              Email<span className="pf-row-note">（不可修改）</span>
+            </label>
+            <div className="pf-row-input">
+              <input id="profile-email" value={profile.email} disabled />
+            </div>
+          </div>
 
-        <FormField label="LINE" htmlFor="profile-line">
-          <input
-            id="profile-line"
-            placeholder="@your_line_id"
-            value={lineContact}
-            onChange={(event) => setLineContact(event.target.value)}
-          />
-        </FormField>
+          {CONTACT_FIELDS.map((contact) => {
+            const Icon = contact.icon;
+            return (
+              <div key={contact.key} className="pf-row">
+                <label htmlFor={`profile-${contact.key}`} className="pf-row-contact">
+                  <Icon />
+                  {contact.label}
+                </label>
+                <div className="pf-row-input">
+                  <input
+                    id={`profile-${contact.key}`}
+                    placeholder={contact.placeholder}
+                    value={contacts[contact.key]}
+                    onChange={(event) => updateContact(contact.key, event.target.value)}
+                  />
+                  <FieldError error={fieldErrors[`${contact.key}_contact`]} />
+                </div>
+              </div>
+            );
+          })}
 
-        <p className="helper-text">請至少提供一種聯絡方式，方便團主或其他成員與您聯繫。</p>
+          <p className="auth-info-note pf-note">
+            請至少提供一種聯絡方式，方便團主或其他成員與您聯繫。
+          </p>
 
-        <Button type="submit" fullWidth loading={saving}>
-          儲存資料
-        </Button>
-      </form>
+          <div className="pf-actions">
+            <Button type="submit" loading={saving} className="pf-submit">
+              <SaveIcon />
+              儲存資料
+            </Button>
+          </div>
+        </form>
+      </div>
     </>
   );
 }

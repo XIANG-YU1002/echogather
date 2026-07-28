@@ -1073,9 +1073,16 @@ POST /api/v1/group-leader-applications
 
 權限：`Member`
 
-Request Body：無。
+Request Body（皆為選填，可整個省略）：
 
-第一版申請不要求申請原因、團主名稱或公開聯絡方式。
+```json
+{
+  "reason": "長期收集鳴潮周邊，想幫同好一起代購官方商品。"
+}
+```
+
+`reason` 為申請原因，選填、上限 1000 字，空白自動正規化為 null
+（2026-07-28 依使用者決議新增）。第一版申請仍不要求團主名稱或公開聯絡方式。
 
 Success：
 
@@ -1088,6 +1095,7 @@ Success：
   "data": {
     "id": "uuid",
     "status": "pending",
+    "reason": "長期收集鳴潮周邊，想幫同好一起代購官方商品。",
     "reviewed_at": null,
     "created_at": "2026-08-01T03:00:00Z"
   }

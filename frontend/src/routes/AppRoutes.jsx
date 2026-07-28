@@ -8,6 +8,7 @@ import SearchPage from "../pages/SearchPage.jsx";
 import ActivityDetailPage from "../pages/ActivityDetailPage.jsx";
 import ProductDetailPage from "../pages/ProductDetailPage.jsx";
 import GroupBuyDetailPage from "../pages/GroupBuyDetailPage.jsx";
+import GroupBuyProductsPage from "../pages/GroupBuyProductsPage.jsx";
 import GroupLeaderListPage from "../pages/GroupLeaderListPage.jsx";
 import GroupLeaderProfilePage from "../pages/GroupLeaderProfilePage.jsx";
 import LoginPage from "../pages/LoginPage.jsx";
@@ -54,6 +55,7 @@ export default function AppRoutes() {
         <Route path="/activities/:activityId" element={<ActivityDetailPage />} />
         <Route path="/products/:productId" element={<ProductDetailPage />} />
         <Route path="/group-buys/:groupBuyId" element={<GroupBuyDetailPage />} />
+        <Route path="/group-buys/:groupBuyId/products" element={<GroupBuyProductsPage />} />
         <Route path="/group-leaders" element={<GroupLeaderListPage />} />
         <Route path="/group-leaders/:groupLeaderId" element={<GroupLeaderProfilePage />} />
 

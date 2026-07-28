@@ -20,6 +20,7 @@ class ApplicationAdminListItem(BaseModel):
     id: uuid.UUID
     user: ApplicationUserRef
     status: GroupLeaderApplicationStatus
+    reason: str | None
     reviewed_at: UTCDateTime | None
     created_at: UTCDateTime
 
@@ -28,6 +29,7 @@ class ApplicationAdminDetailResponse(BaseModel):
     id: uuid.UUID
     user: ApplicationUserRef
     status: GroupLeaderApplicationStatus
+    reason: str | None
     reviewed_by: uuid.UUID | None
     reviewed_at: UTCDateTime | None
     created_at: UTCDateTime

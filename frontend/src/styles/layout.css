@@ -1772,12 +1772,24 @@
   gap: 0.15rem;
 }
 
+/* 依圖 16：每項帶 icon，選中項左側有紫色粗條 */
 .member-sidebar a {
-  padding: 0.6rem 0.85rem;
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.7rem 0.85rem;
   border-radius: var(--radius);
+  border-left: 3px solid transparent;
   color: var(--color-text);
   text-decoration: none;
-  font-size: 0.9rem;
+  font-size: 0.92rem;
+}
+
+.member-sidebar a svg {
+  width: 1.15rem;
+  height: 1.15rem;
+  flex-shrink: 0;
+  color: var(--color-text-muted);
 }
 
 .member-sidebar a:hover {
@@ -1786,24 +1798,41 @@
 
 .member-sidebar a.active {
   background-color: #eef2ff;
+  border-left-color: var(--color-primary);
   color: var(--color-primary-dark);
   font-weight: 600;
 }
 
+.member-sidebar a.active svg {
+  color: var(--color-primary);
+}
+
 .member-sidebar-logout {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  width: 100%;
   margin-top: 0.5rem;
-  padding: 0.6rem 0.85rem;
-  border-radius: var(--radius);
+  padding: 0.7rem 0.85rem;
   border: none;
+  border-top: 1px solid var(--color-border);
+  border-radius: 0 0 var(--radius) var(--radius);
   background: none;
   text-align: left;
   color: var(--color-text-muted);
   cursor: pointer;
-  font-size: 0.9rem;
+  font-size: 0.92rem;
+}
+
+.member-sidebar-logout svg {
+  width: 1.15rem;
+  height: 1.15rem;
+  flex-shrink: 0;
 }
 
 .member-sidebar-logout:hover {
   background-color: #f0f0f7;
+  color: var(--color-danger);
 }
 
 @media (max-width: 767px) {
@@ -4230,4 +4259,1647 @@
 
 .auth-error-line + .auth-error-line {
   margin-top: 0.2rem;
+}
+
+/* ---------------------------------------------------------------------------
+   Profile page (依圖 16 個人資料與聯絡方式頁)
+--------------------------------------------------------------------------- */
+.pf-panel {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  padding: 1.75rem 2rem 2rem;
+}
+
+.pf-head {
+  margin-bottom: 1.5rem;
+}
+
+.pf-head h1 {
+  margin: 0 0 0.4rem;
+  font-size: 1.65rem;
+  font-weight: 800;
+}
+
+.pf-head p {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.92rem;
+}
+
+/* 頭像區：淺色區塊、虛線圓框、右下角相機鈕 */
+.pf-avatar-box {
+  display: flex;
+  align-items: center;
+  gap: 1.75rem;
+  flex-wrap: wrap;
+  background-color: #fafaff;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 1.5rem 1.75rem;
+  margin-bottom: 1.75rem;
+}
+
+.pf-avatar-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.pf-avatar {
+  display: block;
+  width: 7rem;
+  height: 7rem;
+  border-radius: 50%;
+  object-fit: cover;
+  background-color: var(--color-bg);
+  border: 2px dashed #c9c4f0;
+  padding: 4px;
+}
+
+.pf-avatar-fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.25rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  background-color: #eef0fe;
+}
+
+.pf-avatar-camera {
+  position: absolute;
+  right: 0;
+  bottom: 0.35rem;
+  width: 2.35rem;
+  height: 2.35rem;
+  border-radius: 50%;
+  border: 3px solid var(--color-surface);
+  background-color: var(--color-primary);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+}
+
+.pf-avatar-camera:hover:not(:disabled) {
+  background-color: var(--color-primary-dark);
+}
+
+.pf-avatar-camera:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.pf-avatar-camera svg {
+  width: 1.15rem;
+  height: 1.15rem;
+}
+
+.pf-avatar-text h2 {
+  margin: 0 0 0.35rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.pf-avatar-text p {
+  margin: 0 0 0.9rem;
+  color: var(--color-text-muted);
+  font-size: 0.88rem;
+}
+
+.pf-avatar-input {
+  display: none;
+}
+
+.pf-avatar-btn svg {
+  width: 1.05rem;
+  height: 1.05rem;
+}
+
+/* 左標籤右輸入框；窄螢幕改回上下排列 */
+.pf-row {
+  display: grid;
+  grid-template-columns: 13rem minmax(0, 1fr);
+  align-items: start;
+  gap: 1rem;
+  margin-bottom: 1.1rem;
+}
+
+@media (max-width: 767px) {
+  .pf-row {
+    grid-template-columns: 1fr;
+    gap: 0.45rem;
+  }
+}
+
+.pf-row > label {
+  padding-top: 0.85rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+@media (max-width: 767px) {
+  .pf-row > label {
+    padding-top: 0;
+  }
+}
+
+.pf-row-note {
+  color: var(--color-text-muted);
+  font-weight: 500;
+  font-size: 0.85rem;
+}
+
+.pf-row-contact {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.pf-row-contact svg {
+  width: 1.5rem;
+  height: 1.5rem;
+  flex-shrink: 0;
+}
+
+.pf-row-input input {
+  width: 100%;
+  height: 48px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 0 1rem;
+  font-size: 0.95rem;
+}
+
+.pf-row-input input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.pf-row-input input:disabled {
+  background-color: #f5f5fa;
+  color: var(--color-text-muted);
+  cursor: not-allowed;
+}
+
+.pf-note {
+  margin-top: 1.4rem;
+}
+
+.pf-actions {
+  display: flex;
+  justify-content: center;
+  margin-top: 1.75rem;
+}
+
+.pf-submit {
+  min-width: 18rem;
+  height: 50px;
+  border-radius: 10px;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.pf-submit svg {
+  width: 1.15rem;
+  height: 1.15rem;
+}
+
+/* ---------------------------------------------------------------------------
+   Group leader application (依圖 17 申請頁、圖 18 狀態頁)
+--------------------------------------------------------------------------- */
+.gla-head {
+  margin-bottom: 1.5rem;
+}
+
+.gla-head h1 {
+  margin: 0 0 0.4rem;
+  font-size: 1.75rem;
+  font-weight: 800;
+}
+
+.gla-head p {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.92rem;
+}
+
+.gla-panel {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  padding: 1.35rem 1.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.gla-panel-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 0.9rem;
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+
+.gla-panel-title svg {
+  width: 1.2rem;
+  height: 1.2rem;
+  color: var(--color-primary);
+}
+
+.gla-panel-lead {
+  margin: -0.35rem 0 1rem;
+  color: var(--color-text-muted);
+  font-size: 0.88rem;
+  line-height: 1.7;
+}
+
+.gla-two-col {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 1.25rem;
+  align-items: start;
+}
+
+/* 圖 17 是左主欄較寬、右側說明欄較窄 */
+.gla-form-layout {
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+}
+
+@media (max-width: 900px) {
+  .gla-two-col,
+  .gla-form-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* 步驟指示器：橫向連線圓點 */
+.gla-steps {
+  display: flex;
+  list-style: none;
+  margin: 0 0 1.5rem;
+  padding: 0;
+}
+
+.gla-step {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
+}
+
+.gla-step-dot {
+  position: relative;
+  z-index: 1;
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #eceaf6;
+  border: 2px solid #ded9f2;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.gla-step-dot svg {
+  width: 1.2rem;
+  height: 1.2rem;
+}
+
+.gla-step-inner {
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: 50%;
+  background-color: #c4bee8;
+}
+
+/* 連接線：絕對定位貼在圓點垂直中心，首尾兩端各自隱藏外側半段 */
+.gla-step-line {
+  position: absolute;
+  top: 1.2rem;
+  height: 3px;
+  background-color: #e2e0ee;
+}
+
+.gla-step-line-before {
+  left: 0;
+  right: 50%;
+}
+
+.gla-step-line-after {
+  left: 50%;
+  right: 0;
+}
+
+.gla-step:first-child .gla-step-line-before,
+.gla-step:last-child .gla-step-line-after {
+  display: none;
+}
+
+.gla-step-label {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+/* 已完成 */
+.gla-step-done .gla-step-dot {
+  background-color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.gla-step-done .gla-step-line-before,
+.gla-step-done .gla-step-line-after,
+.gla-step-current .gla-step-line-before {
+  background-color: var(--color-primary);
+}
+
+/* 目前步驟：橘色圓框＋實心圓點 */
+.gla-step-current .gla-step-dot {
+  background-color: var(--color-surface);
+  border-color: #f59e0b;
+  border-width: 3px;
+}
+
+.gla-step-current .gla-step-inner {
+  background-color: #f59e0b;
+}
+
+.gla-step-current .gla-step-label {
+  color: var(--color-text);
+  font-weight: 700;
+}
+
+/* 資格確認 */
+.gla-eligibility {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 1.5rem;
+  align-items: center;
+}
+
+@media (max-width: 700px) {
+  .gla-eligibility {
+    grid-template-columns: 1fr;
+  }
+}
+
+.gla-identity {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.gla-avatar {
+  width: 4.5rem;
+  height: 4.5rem;
+  border-radius: 50%;
+  object-fit: cover;
+  background-color: var(--color-bg);
+  flex-shrink: 0;
+}
+
+.gla-avatar-fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  background-color: #eef0fe;
+}
+
+.gla-identity-name {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.1rem;
+  font-weight: 800;
+  margin-bottom: 0.25rem;
+}
+
+.gla-role-tag {
+  background-color: #eef0fe;
+  color: var(--color-primary-dark);
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.15rem 0.5rem;
+  border-radius: 6px;
+}
+
+.gla-identity-email {
+  color: var(--color-text-muted);
+  font-size: 0.88rem;
+  overflow-wrap: anywhere;
+}
+
+.gla-checks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.gla-checks li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+.gla-checks svg {
+  width: 1.1rem;
+  height: 1.1rem;
+  flex-shrink: 0;
+  margin-top: 0.15rem;
+}
+
+.gla-check-ok svg {
+  color: var(--color-success);
+}
+
+.gla-check-fail {
+  color: var(--color-danger);
+}
+
+.gla-check-fail svg {
+  color: var(--color-danger);
+  opacity: 0.45;
+}
+
+/* 聯絡方式清單 */
+.gla-contacts {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.gla-contact {
+  display: grid;
+  grid-template-columns: 9rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.8rem 1rem;
+}
+
+.gla-contact + .gla-contact {
+  border-top: 1px solid var(--color-border);
+}
+
+@media (max-width: 560px) {
+  .gla-contact {
+    grid-template-columns: 1fr auto;
+  }
+  .gla-contact-value {
+    grid-column: 1 / -1;
+  }
+}
+
+.gla-contact-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.gla-contact-head svg {
+  width: 1.4rem;
+  height: 1.4rem;
+  flex-shrink: 0;
+}
+
+.gla-contact-value {
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
+}
+
+.gla-contact-empty {
+  color: var(--color-text-muted);
+}
+
+.gla-contact-tag {
+  background-color: #e8f7ee;
+  color: #15803d;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.2rem 0.55rem;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.gla-contact-btn {
+  padding: 0.35rem 0.75rem;
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+/* 平台規範：使用者提供的 8 條全文，需編號 */
+.gla-rules {
+  margin: 0 0 1.2rem;
+  padding-left: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.gla-rules li {
+  font-size: 0.9rem;
+  line-height: 1.7;
+}
+
+.gla-rules li::marker {
+  color: var(--color-primary);
+  font-weight: 700;
+}
+
+/* 純文字呈現（無勾選框），底部不留多餘間距 */
+.gla-rules-plain {
+  margin-bottom: 0;
+}
+
+.gla-agree {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.92rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.gla-agree input[type="checkbox"] {
+  width: 1.15rem;
+  height: 1.15rem;
+  accent-color: var(--color-primary);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.gla-notes {
+  margin: 0;
+  padding-left: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.gla-notes li {
+  font-size: 0.88rem;
+  line-height: 1.7;
+  color: var(--color-text-muted);
+}
+
+.gla-current-status {
+  margin: 0 0 0.5rem;
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: var(--color-primary);
+}
+
+/* 圖 18 頁首卡 */
+.gla-status-head {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  flex-wrap: wrap;
+}
+
+.gla-status-text {
+  flex: 1;
+  min-width: 12rem;
+}
+
+.gla-status-text h2 {
+  margin: 0 0 0.35rem;
+  font-size: 1.35rem;
+  font-weight: 800;
+}
+
+.gla-status-text p {
+  margin: 0 0 0.6rem;
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+  line-height: 1.7;
+}
+
+.gla-status-time {
+  text-align: right;
+}
+
+.gla-label {
+  display: block;
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+  margin-bottom: 0.2rem;
+}
+
+.gla-status-time strong {
+  font-size: 1rem;
+}
+
+/* 申請資料清單 */
+.gla-data {
+  display: grid;
+  grid-template-columns: 6.5rem minmax(0, 1fr);
+  gap: 0.75rem 1rem;
+  margin: 0;
+  align-items: center;
+}
+
+.gla-data dt {
+  color: var(--color-text-muted);
+  font-size: 0.88rem;
+}
+
+.gla-data dd {
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.gla-mono {
+  font-family: "Courier New", Consolas, monospace;
+  letter-spacing: 0.5px;
+}
+
+.gla-tip {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 1rem 0 0;
+  padding: 0.7rem 0.9rem;
+  background-color: #eef0fe;
+  border-radius: 8px;
+  color: var(--color-primary-dark);
+  font-size: 0.85rem;
+}
+
+.gla-tip svg {
+  width: 1.05rem;
+  height: 1.05rem;
+  flex-shrink: 0;
+}
+
+.gla-actions {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.gla-actions-end {
+  justify-content: flex-end;
+}
+
+.gla-actions .btn {
+  flex: 1;
+  min-width: 12rem;
+  height: 48px;
+  border-radius: 10px;
+  font-weight: 700;
+}
+
+.gla-actions-end .btn {
+  flex: 0 0 auto;
+}
+
+.gla-actions .btn svg {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+/* 申請原因（選填） */
+.gla-optional {
+  background-color: var(--color-bg);
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.15rem 0.45rem;
+  border-radius: 5px;
+}
+
+.gla-reason {
+  width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 0.75rem 0.9rem;
+  font-size: 0.92rem;
+  line-height: 1.7;
+  font-family: inherit;
+  resize: vertical;
+}
+
+.gla-reason:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.gla-reason-count {
+  margin-top: 0.35rem;
+  text-align: right;
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+}
+
+/* 狀態頁的申請原因為多行文字，保留換行 */
+.gla-reason-text {
+  white-space: pre-wrap;
+  font-weight: 500 !important;
+  line-height: 1.7;
+}
+
+/* ---------------------------------------------------------------------------
+   Admin group leader application (依圖 29 列表、圖 30 審核頁)
+--------------------------------------------------------------------------- */
+
+/* 圖 29：聯絡方式摘要改為品牌圖示＋值 */
+.contact-summary-line {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+}
+
+.contact-summary-line svg {
+  width: 1.1rem;
+  height: 1.1rem;
+  flex-shrink: 0;
+}
+
+.contact-summary-line.muted {
+  color: var(--color-text-muted);
+}
+
+.contact-summary-line.muted svg {
+  color: var(--color-text-muted);
+}
+
+/* 圖 29：日期與時間分兩行 */
+.app-time {
+  white-space: nowrap;
+}
+
+.app-time span {
+  display: block;
+}
+
+.app-time-clock {
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+}
+
+/* 圖 30 麵包屑（後台自有樣式，不與前台 Breadcrumb 混用） */
+.adm-crumb {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: -0.75rem 0 1.25rem;
+  font-size: 0.88rem;
+  color: var(--color-text-muted);
+}
+
+.adm-crumb a {
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+.adm-crumb a:hover {
+  text-decoration: underline;
+}
+
+/* 圖 30 頁首卡：頭像｜會員資料｜申請資訊｜狀態與聯絡方式 */
+.adm-app-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1.2fr);
+  gap: 1.75rem;
+  align-items: start;
+}
+
+@media (max-width: 1100px) {
+  .adm-app-head {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .adm-app-meta,
+  .adm-app-contacts {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 560px) {
+  .adm-app-head {
+    grid-template-columns: 1fr;
+  }
+}
+
+.adm-app-avatar {
+  width: 8rem;
+  height: 8rem;
+  border-radius: 50%;
+  object-fit: cover;
+  background-color: var(--color-bg);
+  flex-shrink: 0;
+}
+
+.adm-app-avatar-fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  background-color: #eef0fe;
+}
+
+.adm-app-label {
+  display: block;
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+  margin-bottom: 0.25rem;
+}
+
+.adm-app-label-gap {
+  margin-top: 1rem;
+}
+
+.adm-app-name {
+  display: block;
+  font-size: 1.5rem;
+  font-weight: 800;
+  margin-bottom: 0.9rem;
+}
+
+.adm-app-email {
+  font-size: 0.92rem;
+  overflow-wrap: anywhere;
+}
+
+/* 中間欄以左框線分隔（比照參考圖） */
+.adm-app-meta {
+  border-left: 1px solid var(--color-border);
+  padding-left: 1.75rem;
+}
+
+@media (max-width: 1100px) {
+  .adm-app-meta {
+    border-left: none;
+    padding-left: 0;
+  }
+}
+
+.adm-app-meta strong {
+  display: block;
+  font-size: 1rem;
+  margin-bottom: 0.9rem;
+}
+
+.adm-app-code {
+  font-family: "Courier New", Consolas, monospace;
+  letter-spacing: 0.5px;
+}
+
+.adm-app-contacts ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.adm-app-contacts li {
+  display: grid;
+  grid-template-columns: 1.4rem 5rem minmax(0, 1fr);
+  align-items: center;
+  gap: 0.55rem;
+  font-size: 0.88rem;
+}
+
+.adm-app-contacts svg {
+  width: 1.4rem;
+  height: 1.4rem;
+}
+
+.adm-app-contact-label {
+  color: var(--color-text-muted);
+}
+
+.adm-app-contact-empty {
+  color: var(--color-text-muted);
+}
+
+/* 圖 30 下半：左申請說明、右審核重點 */
+.adm-app-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 1.25rem;
+  /* stretch 讓申請說明與審核重點兩張卡片等高 */
+  align-items: stretch;
+}
+
+/* 這兩張卡片由 grid 控制高度，不用自帶下邊距 */
+.adm-app-body > .admin-panel {
+  margin-bottom: 0;
+}
+
+/* 警告與操作只占右半邊的第二列 */
+.adm-app-tail {
+  grid-column: 2;
+}
+
+@media (max-width: 900px) {
+  .adm-app-body {
+    grid-template-columns: 1fr;
+  }
+  .adm-app-tail {
+    grid-column: 1;
+  }
+}
+
+.adm-app-section {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 1rem;
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+
+.adm-app-reason {
+  margin: 0;
+  white-space: pre-wrap;
+  font-size: 0.92rem;
+  line-height: 1.8;
+}
+
+.adm-app-reason-empty {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 1.1rem 1.25rem;
+  border: 1px dashed var(--color-border);
+  border-radius: 10px;
+  background-color: #fafaff;
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+}
+
+.adm-app-reason-empty svg {
+  width: 1.5rem;
+  height: 1.5rem;
+  flex-shrink: 0;
+  opacity: 0.6;
+}
+
+.adm-app-points {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.adm-app-points li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.9rem 0;
+}
+
+.adm-app-points li + li {
+  border-top: 1px solid var(--color-border);
+}
+
+.adm-app-point-icon {
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+}
+
+.adm-app-points .ok .adm-app-point-icon {
+  background-color: #e8f7ee;
+  color: #15803d;
+}
+
+.adm-app-points .warn .adm-app-point-icon {
+  background-color: #f3f3f8;
+  color: var(--color-text-muted);
+}
+
+.adm-app-point-icon svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.adm-app-points strong {
+  display: block;
+  font-size: 0.95rem;
+  margin-bottom: 0.2rem;
+}
+
+.adm-app-points p {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+  line-height: 1.65;
+}
+
+.adm-app-warning {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0 0 1.25rem;
+  padding: 0.85rem 1.1rem;
+  background-color: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 10px;
+  color: #9a3412;
+  font-size: 0.88rem;
+  line-height: 1.6;
+}
+
+.adm-app-warning::before {
+  content: "⚠";
+  flex-shrink: 0;
+}
+
+.adm-app-actions {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.adm-app-actions .btn {
+  flex: 1;
+  min-width: 10rem;
+  height: 48px;
+  border-radius: 10px;
+  font-weight: 700;
+}
+
+.adm-app-actions .btn svg {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+/* ---------------------------------------------------------------------------
+   Group leader public page (依圖 19 團主公開頁)
+--------------------------------------------------------------------------- */
+.glp-top {
+  display: grid;
+  grid-template-columns: minmax(0, 1.9fr) minmax(0, 1fr);
+  gap: 1.25rem;
+  align-items: stretch;
+  margin-bottom: 2rem;
+}
+
+@media (max-width: 1000px) {
+  .glp-top {
+    grid-template-columns: 1fr;
+  }
+}
+
+.glp-banner {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  padding: 1.75rem;
+  /* 參考圖右側有大張角色插圖，無素材故改為淡紫漸層收邊 */
+  background-image: linear-gradient(105deg, #ffffff 55%, #f4f2fd 100%);
+}
+
+.glp-banner-main {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.glp-avatar {
+  width: 9rem;
+  height: 9rem;
+  border-radius: 50%;
+  object-fit: cover;
+  background-color: var(--color-bg);
+  border: 4px solid var(--color-surface);
+  box-shadow: 0 4px 16px rgba(60, 55, 120, 0.14);
+  flex-shrink: 0;
+}
+
+.glp-avatar-fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 3rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  background-color: #eef0fe;
+}
+
+.glp-banner-text {
+  flex: 1;
+  min-width: 14rem;
+}
+
+.glp-banner-text h1 {
+  margin: 0 0 0.6rem;
+  font-size: 2rem;
+  font-weight: 800;
+}
+
+.glp-intro {
+  margin: 0 0 1rem;
+  color: var(--color-text-muted);
+  font-size: 0.95rem;
+  line-height: 1.8;
+  white-space: pre-wrap;
+}
+
+.glp-stats {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.glp-stat {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.9rem;
+}
+
+.glp-stat svg {
+  width: 1.1rem;
+  height: 1.1rem;
+  color: var(--color-primary);
+  flex-shrink: 0;
+}
+
+.glp-stat-label {
+  color: var(--color-text-muted);
+}
+
+/* 聯絡方式：品牌圖示按鈕，Facebook 為實心主色 */
+.glp-contacts {
+  margin-top: 1.75rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.glp-contacts h2 {
+  margin: 0 0 0.9rem;
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+
+.glp-contact-list {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+/* 三個平台外觀一致：白底外框，圖示保留各自品牌色 */
+.glp-contact {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background-color: var(--color-surface);
+  color: inherit;
+  font-size: 0.88rem;
+  max-width: 100%;
+}
+
+.glp-contact svg {
+  width: 1.4rem;
+  height: 1.4rem;
+  flex-shrink: 0;
+}
+
+.glp-contact-label {
+  font-weight: 600;
+}
+
+.glp-contact-value {
+  color: var(--color-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 只有團主名稱這段是連結 */
+.glp-contact-link {
+  color: var(--color-primary);
+  font-weight: 600;
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.glp-contact-link:hover {
+  text-decoration: underline;
+}
+
+/* 預設團規卡 */
+.glp-rules {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  padding: 1.5rem;
+}
+
+.glp-rules h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 1rem;
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+
+.glp-rules h2 svg {
+  width: 1.2rem;
+  height: 1.2rem;
+  color: var(--color-primary);
+}
+
+.glp-rules-text {
+  white-space: pre-wrap;
+  font-size: 0.9rem;
+  line-height: 1.9;
+}
+
+.glp-rules-note {
+  margin: 1rem 0 0;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+  line-height: 1.7;
+}
+
+/* 區塊標題 */
+.glp-section {
+  margin-bottom: 2.25rem;
+}
+
+.glp-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.1rem;
+}
+
+.glp-section-head h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 800;
+}
+
+.glp-section-head h2 svg {
+  width: 1.35rem;
+  height: 1.35rem;
+  color: var(--color-primary);
+}
+
+/* 活動卡：依使用者指令，改為以「活動」為單位（不再逐一列商品） */
+.glp-activity-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1.25rem;
+}
+
+@media (max-width: 1000px) {
+  .glp-activity-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 620px) {
+  .glp-activity-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.glp-activity {
+  display: flex;
+  flex-direction: column;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  overflow: hidden;
+  text-decoration: none;
+  color: inherit;
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+a.glp-activity:hover {
+  box-shadow: 0 6px 18px rgba(31, 31, 46, 0.08);
+  transform: translateY(-2px);
+}
+
+.glp-activity-image {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  display: block;
+  background-color: var(--color-bg);
+}
+
+.glp-activity-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1rem 1.1rem 1.15rem;
+  flex: 1;
+}
+
+.glp-activity-body h3 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.glp-activity-round {
+  align-self: flex-start;
+  background-color: #eef0fe;
+  color: var(--color-primary-dark);
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.2rem 0.55rem;
+  border-radius: 6px;
+}
+
+.glp-activity-past .glp-activity-round {
+  background-color: var(--color-bg);
+  color: var(--color-text-muted);
+}
+
+.glp-activity-past .glp-activity-image {
+  filter: grayscale(0.6);
+  opacity: 0.85;
+}
+
+.glp-activity-deadline {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.82rem;
+}
+
+.glp-activity-cta {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-top: auto;
+  padding-top: 0.5rem;
+  color: var(--color-primary);
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.glp-activity-cta svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+/* 同一活動的各輪次合併在同一張卡內，逐輪提供入口 */
+.glp-round-list {
+  list-style: none;
+  margin: 0.25rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--color-border);
+}
+
+.glp-round-list li + li {
+  border-top: 1px solid var(--color-border);
+}
+
+.glp-round-list a {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 0;
+  color: inherit;
+  text-decoration: none;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.glp-round-list a:hover {
+  color: var(--color-primary);
+}
+
+.glp-round-date {
+  margin-left: auto;
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+
+.glp-round-list svg {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+}
+
+/* 公開公告：三欄卡片（依決議不做分類標籤與縮圖） */
+.glp-announcement-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1.25rem;
+}
+
+@media (max-width: 1000px) {
+  .glp-announcement-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 620px) {
+  .glp-announcement-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.glp-announcement {
+  display: flex;
+  flex-direction: column;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  padding: 1.25rem 1.35rem;
+}
+
+.glp-announcement h3 {
+  margin: 0 0 0.6rem;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.glp-announcement-content {
+  white-space: pre-wrap;
+  color: var(--color-text-muted);
+  font-size: 0.88rem;
+  line-height: 1.75;
+  margin-bottom: 1rem;
+}
+
+.glp-announcement-date {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: auto 0 0;
+  padding-top: 0.9rem;
+  border-top: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+}
+
+.glp-announcement-date svg {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+}
+
+/* ---------------------------------------------------------------------------
+   Group buy products page（某一次開團的接單商品清單，版面參考活動詳情頁）
+--------------------------------------------------------------------------- */
+/* 已停止接單提示（頁面不放團主／活動卡，資訊由麵包屑提供） */
+.gbp-closed-note {
+  margin: 0 0 1.25rem;
+  padding: 0.8rem 1rem;
+  background-color: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 10px;
+  color: #9a3412;
+  font-size: 0.88rem;
+}
+
+.gbp-count {
+  margin-left: 0.55rem;
+  color: var(--color-text-muted);
+  font-size: 0.82rem;
+  font-weight: 500;
+}
+
+.gbp-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1.25rem;
+}
+
+@media (max-width: 1200px) {
+  .gbp-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 800px) {
+  .gbp-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 520px) {
+  .gbp-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.gbp-card {
+  display: flex;
+  flex-direction: column;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  overflow: hidden;
+  text-decoration: none;
+  color: inherit;
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.gbp-card:hover {
+  box-shadow: 0 6px 18px rgba(31, 31, 46, 0.08);
+  transform: translateY(-2px);
+}
+
+.gbp-card-image {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  display: block;
+  background-color: var(--color-bg);
+}
+
+.gbp-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.85rem 0.95rem 1rem;
+  flex: 1;
+}
+
+.gbp-card-body h3 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.gbp-card-price {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  margin: auto 0 0;
+}
+
+.gbp-card-price span {
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+}
+
+.gbp-card-price strong {
+  color: var(--color-danger);
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+
+.gbp-card-stock {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+}
+
+.gbp-card-stock.is-out {
+  color: var(--color-danger);
+  font-weight: 600;
 }

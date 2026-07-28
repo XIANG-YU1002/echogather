@@ -28,7 +28,7 @@ import { useCart } from "../context/CartContext.jsx";
 const CONTACT_PLATFORM_LABELS = { facebook: "Facebook", discord: "Discord", line: "LINE" };
 const PAYMENT_METHOD_LABELS = {
   bank_transfer: "匯款",
-  cash_on_delivery: "取貨付款",
+  cash_on_delivery: "取貨付款",
 };
 const UNAVAILABLE_REASON_LABELS = {
   closed: "此開團已結單",

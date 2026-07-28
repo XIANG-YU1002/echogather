@@ -829,7 +829,9 @@ group_leader_application
 
 儲存會員申請成為團主的狀態及管理員審核結果。
 
-第一版申請不要求申請說明、團主名稱、公開聯絡方式或審核備註。
+第一版申請不要求團主名稱、公開聯絡方式或審核備註。
+
+申請原因（reason）為選填，於 2026-07-28 依使用者決議新增（migration 0009）。
 
 ---
 
@@ -840,6 +842,7 @@ group_leader_application
 | id | UUID | No | uuid4 | Primary Key |
 | user_id | UUID | No | — | 提出申請的會員 |
 | status | GroupLeaderApplicationStatus | No | pending | 申請狀態 |
+| reason | TEXT | Yes | NULL | 申請原因（選填，上限 1000 字） |
 | reviewed_by_user_id | UUID | Yes | NULL | 審核管理員 |
 | reviewed_at | TIMESTAMPTZ | Yes | NULL | 審核時間 |
 | created_at | TIMESTAMPTZ | No | now() | 申請時間 |

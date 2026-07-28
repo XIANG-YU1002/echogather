@@ -8,14 +8,24 @@ import ErrorState from "../../components/common/ErrorState.jsx";
 import PageLoader from "../../components/common/PageLoader.jsx";
 import ListFooter from "../../components/common/ListFooter.jsx";
 import StatusBadge from "../../components/common/StatusBadge.jsx";
-import { SearchIcon } from "../../components/common/icons.jsx";
+import { useAutoRefresh } from "../../hooks/useAutoRefresh.js";
+import {
+  DiscordIcon,
+  FacebookIcon,
+  LineIcon,
+  MailIcon,
+  SearchIcon,
+} from "../../components/common/icons.jsx";
 
-function formatDateTime(isoString) {
-  return new Date(isoString).toLocaleString("zh-TW", {
-    dateStyle: "medium",
-    timeStyle: "short",
-    timeZone: "Asia/Taipei",
-  });
+/** 依圖 29：日期與時間分兩行顯示。 */
+function formatDateParts(isoString) {
+  const date = new Date(isoString);
+  if (Number.isNaN(date.getTime())) return { date: isoString, time: "" };
+  const pad = (n) => String(n).padStart(2, "0");
+  return {
+    date: `${date.getFullYear()}/${pad(date.getMonth() + 1)}/${pad(date.getDate())}`,
+    time: `${pad(date.getHours())}:${pad(date.getMinutes())}`,
+  };
 }
 
 // 以申請 UUID 前 8 碼組成好讀的申請編號
@@ -23,12 +33,17 @@ function applicationCode(id) {
   return `#${id.replace(/-/g, "").slice(0, 8).toUpperCase()}`;
 }
 
+/** 聯絡方式摘要：已填的平台配品牌圖示，Email 一律列出。 */
 function contactSummary(user) {
   const items = [];
-  if (user.line_contact) items.push(`LINE：${user.line_contact}`);
-  if (user.facebook_contact) items.push(`FB：${user.facebook_contact}`);
-  if (user.discord_contact) items.push(`Discord：${user.discord_contact}`);
-  items.push(`Email：${user.email}`);
+  if (user.line_contact) items.push({ key: "line", icon: LineIcon, value: user.line_contact });
+  if (user.facebook_contact) {
+    items.push({ key: "facebook", icon: FacebookIcon, value: user.facebook_contact });
+  }
+  if (user.discord_contact) {
+    items.push({ key: "discord", icon: DiscordIcon, value: user.discord_contact });
+  }
+  items.push({ key: "email", icon: MailIcon, value: user.email, muted: true });
   return items;
 }
 
@@ -43,21 +58,36 @@ export default function GroupLeaderApplicationListPage() {
   const [pagination, setPagination] = useState(null);
   const [error, setError] = useState(false);
 
-  function load() {
-    setError(false);
-    setApplications(null);
-    getAdminApplications(token, { status: status || undefined, keyword: keyword || undefined, page, pageSize })
+  /** silent=true 供背景輪詢使用：不清空清單也不跳 loading，避免畫面閃動。 */
+  function load({ silent = false } = {}) {
+    if (!silent) {
+      setError(false);
+      setApplications(null);
+    }
+    return getAdminApplications(token, {
+      status: status || undefined,
+      keyword: keyword || undefined,
+      page,
+      pageSize,
+    })
       .then((response) => {
         setApplications(response.data);
         setPagination(response.pagination);
+        setError(false);
       })
-      .catch(() => setError(true));
+      .catch(() => {
+        // 背景刷新失敗不要把已顯示的清單換成錯誤畫面
+        if (!silent) setError(true);
+      });
   }
 
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, keyword, page, pageSize]);
+
+  // 新申請進來時自動出現，不必手動重新整理
+  useAutoRefresh(() => load({ silent: true }));
 
   function handleSearchSubmit(event) {
     event.preventDefault();
@@ -139,12 +169,26 @@ export default function GroupLeaderApplicationListPage() {
                     </td>
                     <td>
                       <span className="contact-summary">
-                        {contactSummary(application.user).map((line) => (
-                          <span key={line}>{line}</span>
-                        ))}
+                        {contactSummary(application.user).map((item) => {
+                          const Icon = item.icon;
+                          return (
+                            <span
+                              key={item.key}
+                              className={`contact-summary-line${item.muted ? " muted" : ""}`}
+                            >
+                              <Icon />
+                              {item.value}
+                            </span>
+                          );
+                        })}
                       </span>
                     </td>
-                    <td>{formatDateTime(application.created_at)}</td>
+                    <td className="app-time">
+                      <span>{formatDateParts(application.created_at).date}</span>
+                      <span className="app-time-clock">
+                        {formatDateParts(application.created_at).time}
+                      </span>
+                    </td>
                     <td>
                       <StatusBadge domain="application" value={application.status} />
                     </td>
