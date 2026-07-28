@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import PaginationParams, get_db
 from app.core.responses import envelope, paginated_envelope
 from app.models.enums import GroupBuyStatus
+from app.schemas.group_leader import GroupLeaderSort
 from app.services import group_leader_public_service
 
 router = APIRouter(prefix="/group-leaders", tags=["group-leaders"])
@@ -14,11 +15,16 @@ router = APIRouter(prefix="/group-leaders", tags=["group-leaders"])
 @router.get("")
 def list_public_profiles(
     keyword: str | None = Query(None),
+    sort: GroupLeaderSort = GroupLeaderSort.CREATED_DESC,
     pagination: PaginationParams = Depends(),
     db: Session = Depends(get_db),
 ) -> dict:
     items, total = group_leader_public_service.list_public_profiles(
-        db, keyword=keyword, page=pagination.page, page_size=pagination.page_size
+        db,
+        keyword=keyword,
+        page=pagination.page,
+        page_size=pagination.page_size,
+        sort=sort,
     )
     return paginated_envelope(
         [i.model_dump(mode="json") for i in items], pagination.page, pagination.page_size, total

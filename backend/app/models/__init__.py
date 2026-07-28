@@ -13,8 +13,10 @@ from app.models.order import (
     OrderNumberCounter,
     OrderStatusHistory,
 )
+from app.models.password_reset import PasswordResetToken
 from app.models.product import Character, Product, ProductCharacter, ProductImage
 from app.models.user import AppUser
+from app.models.verification import EmailVerificationCode
 
 __all__ = [
     "Base",
@@ -38,4 +40,6 @@ __all__ = [
     "ProductFavorite",
     "Announcement",
     "Notification",
+    "EmailVerificationCode",
+    "PasswordResetToken",
 ]

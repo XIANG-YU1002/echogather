@@ -31,6 +31,8 @@ EXPECTED_TABLES = {
     "product_favorite",
     "announcement",
     "notification",
+    "email_verification_code",
+    "password_reset_token",
 }
 
 
@@ -38,7 +40,7 @@ def test_all_tables_registered():
     """規格 18 張表，加上 0003 的 group_buy_product_character、0005 的
     order_status_history 與 0006 的 order_number_counter，共 21 張。"""
     assert set(Base.metadata.tables.keys()) == EXPECTED_TABLES
-    assert len(EXPECTED_TABLES) == 21
+    assert len(EXPECTED_TABLES) == 23
 
 
 def test_app_user_contact_columns_nullable_and_required_by_check_constraint():

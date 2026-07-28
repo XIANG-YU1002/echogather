@@ -1,3 +1,5 @@
+import uuid
+
 from app.models.enums import OrderStatus
 from tests.factories import (
     create_activity,
@@ -16,8 +18,13 @@ def _leader_headers(client, leader_user):
     return auth_headers(token)
 
 
-def test_get_profile_requires_group_leader_profile(client):
-    _, token = register_and_login(client)
+def _unique_display_name() -> str:
+    """測試跑在與示範資料共用的資料庫上，寫死名稱會撞 uq_group_leader_display_name_lower。"""
+    return f"測試團-{uuid.uuid4().hex[:8]}"
+
+
+def test_get_profile_requires_group_leader_profile(client, db_session):
+    _, token = register_and_login(client, db_session)
     response = client.get("/api/v1/group-leader/profile", headers=auth_headers(token))
     assert response.status_code == 404
     assert response.json()["error"]["code"] == "GROUP_LEADER_PROFILE_NOT_FOUND"
@@ -41,15 +48,16 @@ def test_update_profile_sets_display_name_and_contact(client, db_session):
     create_group_leader_profile(db_session, user=leader_user, complete=False)
     headers = _leader_headers(client, leader_user)
 
+    display_name = _unique_display_name()
     response = client.patch(
         "/api/v1/group-leader/profile",
-        json={"display_name": "月影團", "discord_contact": "moon_group"},
+        json={"display_name": display_name, "discord_contact": "moon_group"},
         headers=headers,
     )
 
     assert response.status_code == 200
     data = response.json()["data"]
-    assert data["display_name"] == "月影團"
+    assert data["display_name"] == display_name
     assert data["is_profile_complete"] is True
 
 
@@ -69,14 +77,15 @@ def test_update_profile_display_name_immutable_after_set(client, db_session):
 
 
 def test_update_profile_display_name_duplicate(client, db_session):
-    create_group_leader_profile(db_session, complete=False, display_name="月影團")
+    taken_name = _unique_display_name()
+    create_group_leader_profile(db_session, complete=False, display_name=taken_name)
     leader_user = create_user(db_session)
     create_group_leader_profile(db_session, user=leader_user, complete=False)
     headers = _leader_headers(client, leader_user)
 
     response = client.patch(
         "/api/v1/group-leader/profile",
-        json={"display_name": "月影團", "discord_contact": "abc"},
+        json={"display_name": taken_name, "discord_contact": "abc"},
         headers=headers,
     )
 

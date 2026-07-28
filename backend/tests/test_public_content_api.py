@@ -10,6 +10,7 @@ from tests.factories import (
     create_group_leader_profile,
     create_order_with_item,
     create_product,
+    create_user,
     link_product_character,
 )
 
@@ -232,6 +233,92 @@ def test_public_group_leader_profile_success(client, db_session):
     assert data["display_name"] == profile.display_name
     assert data["public_contacts"]["discord"] == "leader_discord"
     assert data["statistics"] == {"group_buy_count": 0, "completed_order_count": 0}
+
+
+def test_public_group_leader_list_sort_options(client, db_session):
+    """依圖 12 的排序下拉：加入時間新／舊、開團數、完成訂單數。
+
+    測試跑在與示範資料共用的資料庫上，所以用隨機關鍵字把查詢限縮在本測試建立的
+    團主；created_at 也明確指定——整個測試在同一交易內，server default 的 now()
+    會讓兩筆時間完全相同，排序就測不出來。
+    """
+    suffix = uuid.uuid4().hex[:8]
+    base = datetime(2026, 1, 1, tzinfo=timezone.utc)
+
+    older = create_group_leader_profile(
+        db_session, display_name=f"排序A{suffix}", created_at=base
+    )
+    newer = create_group_leader_profile(
+        db_session, display_name=f"排序B{suffix}", created_at=base + timedelta(days=30)
+    )
+    # 只有 newer 有開團，且該開團有一筆已完成訂單
+    group_buy = create_group_buy(db_session, group_leader_profile=newer)
+    product = create_product(db_session)
+    group_buy_product = create_group_buy_product(db_session, group_buy, product)
+    create_order_with_item(
+        db_session,
+        create_user(db_session),
+        group_buy,
+        group_buy_product,
+        1,
+        status=OrderStatus.COMPLETED,
+    )
+
+    def names(sort: str) -> list[str]:
+        response = client.get(f"/api/v1/group-leaders?keyword={suffix}&sort={sort}")
+        assert response.status_code == 200
+        return [item["display_name"] for item in response.json()["data"]]
+
+    assert names("created_desc") == [newer.display_name, older.display_name]
+    assert names("created_asc") == [older.display_name, newer.display_name]
+    assert names("group_buy_desc") == [newer.display_name, older.display_name]
+    assert names("completed_order_desc") == [newer.display_name, older.display_name]
+
+    # 未帶 sort 時預設為加入時間新到舊
+    default_response = client.get(f"/api/v1/group-leaders?keyword={suffix}")
+    assert default_response.status_code == 200
+    assert [item["display_name"] for item in default_response.json()["data"]] == [
+        newer.display_name,
+        older.display_name,
+    ]
+
+
+def test_public_group_leader_list_statistics(client, db_session):
+    """列表的統計值改以子查詢一併取回（原本逐筆再查一次），值必須不變。"""
+    suffix = uuid.uuid4().hex[:8]
+    profile = create_group_leader_profile(db_session, display_name=f"統計{suffix}")
+    group_buy = create_group_buy(db_session, group_leader_profile=profile)
+    product = create_product(db_session)
+    group_buy_product = create_group_buy_product(db_session, group_buy, product)
+    create_order_with_item(
+        db_session,
+        create_user(db_session),
+        group_buy,
+        group_buy_product,
+        1,
+        status=OrderStatus.COMPLETED,
+    )
+    # 未完成的訂單不該被算進完成訂單數
+    create_order_with_item(
+        db_session,
+        create_user(db_session),
+        group_buy,
+        group_buy_product,
+        1,
+        status=OrderStatus.PAID,
+    )
+
+    response = client.get(f"/api/v1/group-leaders?keyword={suffix}")
+
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert len(data) == 1
+    assert data[0]["statistics"] == {"group_buy_count": 1, "completed_order_count": 1}
+
+
+def test_public_group_leader_list_invalid_sort_rejected(client, db_session):
+    response = client.get("/api/v1/group-leaders?sort=not_a_sort")
+    assert response.status_code == 422
 
 
 def test_public_group_leader_group_buys_and_announcements(client, db_session):

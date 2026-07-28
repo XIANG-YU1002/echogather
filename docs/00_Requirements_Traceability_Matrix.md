@@ -138,6 +138,9 @@
 - **API：** GET /search、/search/activities、/search/products、/search/characters
 - **資料表：** activity, product, character（trigram index）
 - **Business Rules：** §14
+- **註（2026-07-23 使用者決議）：** 前台搜尋結果頁不顯示「活動」分區，只顯示商品與角色。
+  `/search` 的 activities 區段與 `/search/activities` 端點皆保留，後端測試不變；
+  詳見 03_UI_Wireframe_Specification_v2.1 §10.1。
 
 ### 3.13 Image Upload
 - **API：** POST /uploads/images

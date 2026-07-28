@@ -827,7 +827,11 @@ Request：
 }
 ```
 
-註冊成功後不自動登入，前端導向登入頁。
+註冊成功後前端自動以同一組帳密呼叫 `POST /auth/login` 取得 Token 並導向首頁
+（2026-07-28 修訂，原為「不自動登入，前端導向登入頁」）。API 本身仍不簽發 Token。
+
+註冊請求另需帶 `verification_code`（Email 驗證碼，必填），詳見
+`POST /auth/verification-codes`。
 
 Errors：
 

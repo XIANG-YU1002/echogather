@@ -13,7 +13,7 @@ def _admin_headers(client, db_session):
 
 def test_create_platform_announcement_notifies_all_members(client, db_session):
     admin_headers = _admin_headers(client, db_session)
-    _, member_token = register_and_login(client)
+    _, member_token = register_and_login(client, db_session)
     member_headers = auth_headers(member_token)
 
     response = client.post(
@@ -78,8 +78,8 @@ def test_delete_platform_announcement(client, db_session):
     assert detail_response.status_code == 404
 
 
-def test_non_admin_cannot_create_platform_announcement(client):
-    _, token = register_and_login(client)
+def test_non_admin_cannot_create_platform_announcement(client, db_session):
+    _, token = register_and_login(client, db_session)
     response = client.post(
         "/api/v1/admin/announcements",
         json={"title": "標題", "content": "內容"},

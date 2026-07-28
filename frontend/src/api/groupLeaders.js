@@ -1,7 +1,9 @@
 import { apiRequest } from "./client.js";
 
-export function listGroupLeaders({ keyword, page = 1, pageSize = 20 } = {}) {
-  return apiRequest("/group-leaders", { params: { keyword, page, page_size: pageSize } });
+export function listGroupLeaders({ keyword, page = 1, pageSize = 20, sort } = {}) {
+  return apiRequest("/group-leaders", {
+    params: { keyword, page, page_size: pageSize, sort },
+  });
 }
 
 export function getGroupLeaderProfile(groupLeaderId) {

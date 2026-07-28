@@ -8,12 +8,42 @@ from app.schemas.user import (
     CurrentSessionResponse,
     LoginRequest,
     LoginResponse,
+    PasswordResetRequest,
     RegisterRequest,
     RegisterResponse,
+    ResetPasswordRequest,
+    SendVerificationCodeRequest,
 )
 from app.services import auth_service, user_service
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+@router.post("/verification-codes", status_code=status.HTTP_201_CREATED)
+def send_verification_code(
+    payload: SendVerificationCodeRequest, db: Session = Depends(get_db)
+) -> dict:
+    result = auth_service.send_verification_code(db, payload)
+    return envelope(result.model_dump(mode="json"))
+
+
+@router.post("/password-reset-requests", status_code=status.HTTP_201_CREATED)
+def request_password_reset(
+    payload: PasswordResetRequest, db: Session = Depends(get_db)
+) -> dict:
+    result = auth_service.request_password_reset(db, payload)
+    return envelope(result.model_dump(mode="json"))
+
+
+@router.get("/password-reset-tokens/{token}")
+def verify_password_reset_token(token: str, db: Session = Depends(get_db)) -> dict:
+    """前端在顯示重設表單前先確認連結有效，避免使用者填完才被拒。"""
+    return envelope({"is_valid": auth_service.verify_password_reset_token(db, token)})
+
+
+@router.post("/password-reset", status_code=status.HTTP_204_NO_CONTENT)
+def reset_password(payload: ResetPasswordRequest, db: Session = Depends(get_db)) -> None:
+    auth_service.reset_password(db, payload)
 
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)

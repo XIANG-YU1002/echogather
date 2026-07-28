@@ -24,8 +24,8 @@ def _leader_headers(client, leader_user):
     return auth_headers(token)
 
 
-def _create_order(client, group_buy_product_id, quantity=1):
-    _, token = register_and_login(client)
+def _create_order(client, db_session, group_buy_product_id, quantity=1):
+    _, token = register_and_login(client, db_session)
     headers = auth_headers(token)
     add_response = client.post(
         "/api/v1/follow-list/items",
@@ -44,7 +44,7 @@ def test_get_orders_and_detail_for_leader(client, db_session):
     leader_user, _leader_profile, _group_buy, group_buy_product = _setup_leader_and_group_buy(
         db_session
     )
-    order_id = _create_order(client, group_buy_product.id)
+    order_id = _create_order(client, db_session, group_buy_product.id)
     leader_headers = _leader_headers(client, leader_user)
 
     list_response = client.get("/api/v1/group-leader/orders", headers=leader_headers)
@@ -74,7 +74,7 @@ def test_accept_then_conflict_on_repeat(client, db_session):
     leader_user, _leader_profile, _group_buy, group_buy_product = _setup_leader_and_group_buy(
         db_session
     )
-    order_id = _create_order(client, group_buy_product.id)
+    order_id = _create_order(client, db_session, group_buy_product.id)
     leader_headers = _leader_headers(client, leader_user)
 
     accept_response = client.post(
@@ -108,7 +108,7 @@ def test_status_history_written_on_transitions(client, db_session):
     leader_headers = _leader_headers(client, leader_user)
 
     # 建立即寫入一筆
-    accepted_id = _create_order(client, group_buy_product.id)
+    accepted_id = _create_order(client, db_session, group_buy_product.id)
     entries = history_for(accepted_id)
     assert [e.status.value for e in entries] == ["pending_confirmation"]
 
@@ -131,7 +131,7 @@ def test_status_history_written_on_transitions(client, db_session):
     ]
 
     # 另一張訂單拒絕 -> note 存拒絕原因
-    rejected_id = _create_order(client, group_buy_product.id)
+    rejected_id = _create_order(client, db_session, group_buy_product.id)
     assert client.post(
         f"/api/v1/group-leader/orders/{rejected_id}/reject",
         json={"reason": "本次可接受數量不足。"},
@@ -146,7 +146,7 @@ def test_reject_order_requires_reason(client, db_session):
     leader_user, _leader_profile, _group_buy, group_buy_product = _setup_leader_and_group_buy(
         db_session
     )
-    order_id = _create_order(client, group_buy_product.id)
+    order_id = _create_order(client, db_session, group_buy_product.id)
     leader_headers = _leader_headers(client, leader_user)
 
     blank_response = client.post(
@@ -171,7 +171,7 @@ def test_full_order_lifecycle(client, db_session):
     leader_user, _leader_profile, _group_buy, group_buy_product = _setup_leader_and_group_buy(
         db_session
     )
-    order_id = _create_order(client, group_buy_product.id)
+    order_id = _create_order(client, db_session, group_buy_product.id)
     leader_headers = _leader_headers(client, leader_user)
 
     client.post(f"/api/v1/group-leader/orders/{order_id}/accept", headers=leader_headers)
@@ -201,7 +201,7 @@ def test_order_not_owned_by_other_leader(client, db_session):
     leader_user, _leader_profile, _group_buy, group_buy_product = _setup_leader_and_group_buy(
         db_session
     )
-    order_id = _create_order(client, group_buy_product.id)
+    order_id = _create_order(client, db_session, group_buy_product.id)
 
     other_leader_user = create_user(db_session)
     create_group_leader_profile(db_session, user=other_leader_user, complete=True)
@@ -218,7 +218,7 @@ def test_approve_cancellation_cancels_order(client, db_session):
     leader_user, _leader_profile, _group_buy, group_buy_product = _setup_leader_and_group_buy(
         db_session
     )
-    _, member_token = register_and_login(client)
+    _, member_token = register_and_login(client, db_session)
     member_headers = auth_headers(member_token)
     add_response = client.post(
         "/api/v1/follow-list/items",
@@ -255,7 +255,7 @@ def test_reject_cancellation_keeps_order_status(client, db_session):
     leader_user, _leader_profile, _group_buy, group_buy_product = _setup_leader_and_group_buy(
         db_session
     )
-    _, member_token = register_and_login(client)
+    _, member_token = register_and_login(client, db_session)
     member_headers = auth_headers(member_token)
     client.post(
         "/api/v1/follow-list/items",
@@ -291,7 +291,7 @@ def test_approve_already_processed_cancellation_conflicts(client, db_session):
     leader_user, _leader_profile, _group_buy, group_buy_product = _setup_leader_and_group_buy(
         db_session
     )
-    _, member_token = register_and_login(client)
+    _, member_token = register_and_login(client, db_session)
     member_headers = auth_headers(member_token)
     client.post(
         "/api/v1/follow-list/items",

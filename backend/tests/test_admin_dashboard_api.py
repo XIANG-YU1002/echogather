@@ -36,7 +36,7 @@ def test_dashboard_counts(client, db_session):
     group_buy = create_group_buy(db_session, group_leader_profile=leader_profile, activity=activity)
     create_group_buy_product(db_session, group_buy, product)
 
-    _, member_token = register_and_login(client)
+    _, member_token = register_and_login(client, db_session)
     member_headers = auth_headers(member_token)
     client.post("/api/v1/group-leader-applications", headers=member_headers)
 
@@ -66,7 +66,7 @@ def test_current_group_buys_list(client, db_session):
     assert len(response.json()["data"]) >= 1
 
 
-def test_dashboard_requires_admin(client):
-    _, token = register_and_login(client)
+def test_dashboard_requires_admin(client, db_session):
+    _, token = register_and_login(client, db_session)
     response = client.get("/api/v1/admin/dashboard", headers=auth_headers(token))
     assert response.status_code == 403

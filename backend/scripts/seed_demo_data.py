@@ -11,7 +11,8 @@
   註：資料庫有 uq_group_buy_leader_activity_open（同一團主對同一活動同時只能有
   一個進行中的開團），5 位不同團主各開一團不違反此限制。
 - 5 位一般會員，其中 1 位刻意不下任何訂單（保留空帳號情境），
-  另 1 位持有一張未送出的跟團清單，讓購物車／確認訂單頁仍可預覽。
+  另 1 位持有一張未送出的跟團清單，讓購物車／確認訂單頁仍可預覽，
+  並收藏該活動底下全部商品（含下架與未定價），讓收藏頁有滿版網格與分頁可看。
   其餘會員各有至少一筆訂單，涵蓋所有訂單狀態與取消申請情境。
 
 寫入真實 Supabase 資料庫（非自動 rollback 的測試資料庫）。
@@ -39,6 +40,7 @@ from app.models.enums import (
     PaymentMethod,
     UserRole,
 )
+from app.models.favorite import ProductFavorite
 from app.models.notification import Notification
 from app.models.follow_list import FollowList, FollowListItem
 from app.models.group_buy import GroupBuy, GroupBuyProduct, GroupBuyProductCharacter
@@ -77,6 +79,12 @@ LEADER_PLAN = [
         "introduction": "專接官方周邊，固定每月開一團，出貨速度快。",
         "contact_platform": ContactPlatform.DISCORD,
         "contact_value": "moon_shadow",
+        # 主要聯絡平台以外，團主公開資料可額外填寫的聯絡方式（圖 12 卡片三欄）。
+        # 刻意只讓部分團主填滿三欄，另一部分維持單一，兩種情境都看得到。
+        "extra_profile_contacts": {
+            "facebook_url": "https://www.facebook.com/moonshadow.wuwa",
+            "line_contact": "@moonshadow",
+        },
         "payment_method": PaymentMethod.BANK_TRANSFER,
         "payment_method_note": "團費確認後再私訊告知匯款帳號",
         "requires_second_payment": True,
@@ -99,6 +107,10 @@ LEADER_PLAN = [
         "introduction": "新手團主，以面交取貨為主，歡迎詢問。",
         "contact_platform": ContactPlatform.LINE,
         "contact_value": "@starry_sea",
+        "extra_profile_contacts": {
+            "facebook_url": "https://www.facebook.com/starrysea.group",
+            "discord_contact": "starrysea#0721",
+        },
         "payment_method": PaymentMethod.CASH_ON_DELIVERY,
         "payment_method_note": None,
         "requires_second_payment": False,
@@ -118,7 +130,11 @@ LEADER_PLAN = [
         "display_name": "風鈴草",
         "introduction": "長期經營，配合國際運送，接受大量訂購。",
         "contact_platform": ContactPlatform.FACEBOOK,
-        "contact_value": "facebook.com/windbell.group",
+        "contact_value": "https://www.facebook.com/windbell.group",
+        "extra_profile_contacts": {
+            "discord_contact": "windbell#1122",
+            "line_contact": "@windbell",
+        },
         "payment_method": PaymentMethod.BANK_TRANSFER,
         "payment_method_note": "可分兩次付款，細節請私訊",
         "requires_second_payment": False,
@@ -249,13 +265,18 @@ def _contact_fields(platform, value):
     }
 
 
-def _profile_contact_fields(platform, value):
-    """group_leader_profile 的聯絡欄位（Facebook 存的是網址欄位 facebook_url）。"""
-    return {
+def _profile_contact_fields(platform, value, extra=None):
+    """group_leader_profile 的聯絡欄位（Facebook 存的是網址欄位 facebook_url）。
+
+    `extra` 為主要平台以外額外填寫的聯絡方式，讓部分團主三個平台都有值。
+    """
+    fields = {
         "facebook_url": value if platform == ContactPlatform.FACEBOOK else None,
         "discord_contact": value if platform == ContactPlatform.DISCORD else None,
         "line_contact": value if platform == ContactPlatform.LINE else None,
     }
+    fields.update(extra or {})
+    return fields
 
 
 def _load_catalog(db):
@@ -339,13 +360,21 @@ def _create_group_buys(db, activity, products, characters, leader_users):
     now = datetime.now(timezone.utc)
     results = []
 
-    for plan, user in zip(LEADER_PLAN, leader_users):
+    for index, (plan, user) in enumerate(zip(LEADER_PLAN, leader_users)):
         profile = GroupLeaderProfile(
             user_id=user.id,
             display_name=plan["display_name"],
             introduction=plan["introduction"],
             default_rules=plan["rules"],
-            **_profile_contact_fields(plan["contact_platform"], plan["contact_value"]),
+            # created_at 的 server default 是 PostgreSQL now()，它回傳「交易開始時間」，
+            # 整份 seed 跑在同一交易內會讓所有團主的加入時間完全相同，
+            # 團主列表「依加入時間」排序就看不出差異。這裡明確錯開。
+            created_at=now - timedelta(days=(len(LEADER_PLAN) - index) * 30),
+            **_profile_contact_fields(
+                plan["contact_platform"],
+                plan["contact_value"],
+                plan.get("extra_profile_contacts"),
+            ),
         )
         db.add(profile)
         db.flush()
@@ -650,6 +679,35 @@ def _create_follow_list(db, member_users, bundles):
     return member, profile
 
 
+def _create_favorites(db, member_users, activity):
+    """給 demo-member2 收藏該活動底下所有商品（依圖 11 我的收藏頁）。
+
+    刻意含下架與未定價商品，讓收藏頁的灰化樣式、「未提供官方原價」與分頁
+    都有資料可看。商品目錄本身不由本腳本建立（見檔頭說明），這裡只挑現有商品。
+    """
+    member = member_users[1]
+    product_ids = (
+        db.execute(
+            text("SELECT id FROM product WHERE activity_id = :aid ORDER BY created_at"),
+            {"aid": activity.id},
+        )
+        .scalars()
+        .all()
+    )
+
+    # 明確給遞增的 created_at，收藏頁「依收藏時間」排序才有穩定且合理的順序
+    base_time = datetime.now(timezone.utc) - timedelta(days=len(product_ids))
+    for index, product_id in enumerate(product_ids):
+        db.add(
+            ProductFavorite(
+                user_id=member.id,
+                product_id=product_id,
+                created_at=base_time + timedelta(days=index),
+            )
+        )
+    return member, len(product_ids)
+
+
 def main() -> None:
     db = SessionLocal()
     try:
@@ -662,6 +720,7 @@ def main() -> None:
         orders = _create_orders(db, member_users, bundles, activity, character_names)
         announcements = _create_announcements(db, admin, member_users, bundles, orders)
         cart_member, cart_profile = _create_follow_list(db, member_users, bundles)
+        favorite_member, favorite_count = _create_favorites(db, member_users, activity)
 
         db.commit()
 
@@ -692,6 +751,8 @@ def main() -> None:
                 tags.append("刻意無訂單")
             if plan["email"] == cart_member.email:
                 tags.append(f"持有未送出購物車（{cart_profile.display_name}）")
+            if plan["email"] == favorite_member.email:
+                tags.append(f"收藏 {favorite_count} 項商品")
             suffix = f"  ← {'、'.join(tags)}" if tags else ""
             print(f"  {plan['email']:28} 訂單 {count} 筆{suffix}")
 

@@ -16,7 +16,7 @@ def _create_order_and_accept(client, db_session):
     leader_user, _leader_profile, _group_buy, group_buy_product = _setup_leader_and_group_buy(
         db_session
     )
-    _, member_token = register_and_login(client)
+    _, member_token = register_and_login(client, db_session)
     member_headers = auth_headers(member_token)
     client.post(
         "/api/v1/follow-list/items",
@@ -112,7 +112,7 @@ def test_mark_other_users_notification_not_found(client, db_session):
         0
     ]["id"]
 
-    _, other_token = register_and_login(client)
+    _, other_token = register_and_login(client, db_session)
     response = client.patch(
         f"/api/v1/notifications/{notification_id}/read", headers=auth_headers(other_token)
     )

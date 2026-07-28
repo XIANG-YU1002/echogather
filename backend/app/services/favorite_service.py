@@ -9,13 +9,18 @@ from app.schemas.favorite import (
     FavoriteActivityRef,
     FavoriteItem,
     FavoriteProductSummary,
+    FavoriteSort,
 )
 
 
 def list_favorites(
-    db: Session, user_id: uuid.UUID, page: int, page_size: int
+    db: Session,
+    user_id: uuid.UUID,
+    page: int,
+    page_size: int,
+    sort: FavoriteSort = FavoriteSort.CREATED_DESC,
 ) -> tuple[list[FavoriteItem], int]:
-    rows, total = favorite_repository.list_by_user(db, user_id, page, page_size)
+    rows, total = favorite_repository.list_by_user(db, user_id, page, page_size, sort)
     items = [
         FavoriteItem(
             favorite_id=favorite.id,
@@ -24,6 +29,8 @@ def list_favorites(
                 name=product.name,
                 primary_image_url=product.primary_image_url,
                 is_active=product.is_active,
+                official_price=product.official_price,
+                official_currency=product.official_currency,
                 activity=FavoriteActivityRef.model_validate(activity, from_attributes=True),
             ),
             created_at=favorite.created_at,

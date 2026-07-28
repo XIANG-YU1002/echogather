@@ -1,8 +1,18 @@
+import enum
 import uuid
 
 from pydantic import BaseModel
 
 from app.schemas.common import UTCDateTime
+
+
+class GroupLeaderSort(str, enum.Enum):
+    """公開團主列表排序方式（依圖 12 的排序下拉）。"""
+
+    CREATED_DESC = "created_desc"
+    CREATED_ASC = "created_asc"
+    GROUP_BUY_DESC = "group_buy_desc"
+    COMPLETED_ORDER_DESC = "completed_order_desc"
 
 
 class GroupLeaderSummary(BaseModel):

@@ -3137,3 +3137,1097 @@
   width: 1rem;
   height: 1rem;
 }
+
+/* ---------------------------------------------------------------------------
+   Favorites page (依圖 11 我的收藏頁)
+--------------------------------------------------------------------------- */
+.fav-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 0.9rem 1.1rem;
+  margin-bottom: 1.5rem;
+}
+
+.fav-bar-count {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  font-size: 0.95rem;
+}
+
+.fav-bar-icon {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 8px;
+  background-color: #eef0fe;
+  color: var(--color-primary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.fav-bar-icon svg {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.fav-bar-label {
+  color: var(--color-text-muted);
+}
+
+.fav-bar-divider {
+  width: 1px;
+  height: 1.1rem;
+  background-color: var(--color-border);
+}
+
+.fav-bar-value {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--color-primary);
+}
+
+.fav-bar-unit {
+  color: var(--color-text-muted);
+}
+
+.fav-bar-sort {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
+}
+
+.fav-bar-sort select {
+  width: auto;
+  min-width: 12.5rem;
+  font-size: 0.9rem;
+  padding: 0.5rem 0.7rem;
+}
+
+.fav-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1.25rem;
+}
+
+@media (max-width: 1200px) {
+  .fav-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .fav-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .fav-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.fav-card {
+  display: flex;
+  flex-direction: column;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  overflow: hidden;
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.fav-card:hover {
+  box-shadow: 0 6px 18px rgba(31, 31, 46, 0.08);
+  transform: translateY(-2px);
+}
+
+.fav-thumb {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  background-color: var(--color-bg);
+}
+
+.fav-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.fav-thumb-badge {
+  position: absolute;
+  top: 0.6rem;
+  left: 0.6rem;
+  background-color: rgba(31, 31, 46, 0.82);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.25rem 0.55rem;
+  border-radius: 6px;
+}
+
+.fav-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.85rem 0.95rem 1rem;
+  flex: 1;
+}
+
+.fav-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.fav-activity {
+  background-color: #eef0fe;
+  color: var(--color-primary-dark);
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.22rem 0.55rem;
+  border-radius: 6px;
+}
+
+.fav-heart {
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  color: var(--color-primary);
+  line-height: 0;
+  flex-shrink: 0;
+}
+
+.fav-heart:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.fav-heart svg {
+  width: 1.35rem;
+  height: 1.35rem;
+}
+
+.fav-name {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.fav-price {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.fav-price-empty {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--color-text-muted);
+}
+
+.fav-view {
+  margin-top: auto;
+  width: 100%;
+  justify-content: center;
+}
+
+/* 已下架商品：整卡灰化，但仍可點進商品頁與取消收藏 */
+.fav-card.inactive .fav-thumb img,
+.fav-card.inactive .fav-activity {
+  filter: grayscale(1);
+  opacity: 0.75;
+}
+
+.fav-card.inactive .fav-name,
+.fav-card.inactive .fav-price {
+  color: var(--color-text-muted);
+}
+
+.fav-card.inactive .fav-heart {
+  color: #b6b6c4;
+}
+
+/* ---------------------------------------------------------------------------
+   Group leader list page (依圖 12 團主列表頁)
+--------------------------------------------------------------------------- */
+.ldr-head {
+  margin-bottom: 1.5rem;
+}
+
+.ldr-head h1 {
+  margin: 0 0 0.35rem;
+  font-size: 2rem;
+  font-weight: 800;
+}
+
+.ldr-head p {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.ldr-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.5rem;
+}
+
+.ldr-search {
+  position: relative;
+  flex: 1;
+  max-width: 30rem;
+  min-width: 15rem;
+}
+
+.ldr-search-icon {
+  position: absolute;
+  left: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--color-text-muted);
+  line-height: 0;
+  pointer-events: none;
+}
+
+.ldr-search-icon svg {
+  width: 1.05rem;
+  height: 1.05rem;
+}
+
+.ldr-search input {
+  width: 100%;
+  height: 44px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background-color: var(--color-surface);
+  padding: 0 1.1rem 0 2.7rem;
+  font-size: 0.95rem;
+}
+
+.ldr-search input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.ldr-sort {
+  width: auto;
+  min-width: 14rem;
+  height: 44px;
+  border-radius: 10px;
+}
+
+.ldr-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.ldr-card {
+  display: grid;
+  grid-template-columns: auto minmax(12rem, 1fr) minmax(0, 2fr) auto;
+  align-items: center;
+  gap: 1.5rem;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  padding: 1.25rem 1.5rem;
+}
+
+@media (max-width: 1100px) {
+  .ldr-card {
+    grid-template-columns: auto minmax(0, 1fr);
+    row-gap: 1.1rem;
+  }
+
+  .ldr-panel,
+  .ldr-view {
+    grid-column: 1 / -1;
+  }
+}
+
+.ldr-avatar {
+  width: 7rem;
+  height: 7rem;
+  border-radius: 50%;
+  object-fit: cover;
+  background-color: var(--color-bg);
+  flex-shrink: 0;
+}
+
+.ldr-avatar-fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  background-color: #eef0fe;
+}
+
+.ldr-name {
+  margin: 0 0 0.5rem;
+  font-size: 1.35rem;
+  font-weight: 800;
+}
+
+.ldr-intro {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+  line-height: 1.65;
+}
+
+/* 統計三欄在上、聯絡方式三欄在下，中間以分隔線隔開 */
+.ldr-panel {
+  display: flex;
+  flex-direction: column;
+}
+
+.ldr-stats,
+.ldr-contacts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.ldr-stats {
+  padding-bottom: 0.9rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.ldr-contacts {
+  padding-top: 0.9rem;
+}
+
+@media (max-width: 700px) {
+  .ldr-stats,
+  .ldr-contacts {
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  .ldr-stat + .ldr-stat,
+  .ldr-contact + .ldr-contact {
+    border-left: none;
+  }
+}
+
+.ldr-stat,
+.ldr-contact {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0 0.9rem;
+  min-width: 0;
+}
+
+.ldr-stat + .ldr-stat,
+.ldr-contact + .ldr-contact {
+  border-left: 1px solid var(--color-border);
+}
+
+.ldr-stat-icon {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 8px;
+  background-color: #eef0fe;
+  color: var(--color-primary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.ldr-stat-icon svg {
+  width: 1.05rem;
+  height: 1.05rem;
+}
+
+.ldr-stat-text,
+.ldr-contact-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.ldr-stat-label,
+.ldr-contact-label {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.ldr-stat-value {
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+/* 品牌圖示已自帶品牌色圓底，不套紫色方塊 */
+.ldr-contact-icon {
+  line-height: 0;
+  flex-shrink: 0;
+}
+
+.ldr-contact-icon svg {
+  width: 1.6rem;
+  height: 1.6rem;
+}
+
+.ldr-contact-value {
+  font-size: 0.9rem;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ldr-contact-link {
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+.ldr-contact-link:hover {
+  text-decoration: underline;
+}
+
+.ldr-contact-empty {
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+
+.ldr-view {
+  white-space: nowrap;
+  justify-self: end;
+}
+
+/* ---------------------------------------------------------------------------
+   Search results page (依圖 13 搜尋結果頁)
+--------------------------------------------------------------------------- */
+.sr-head {
+  margin-bottom: 2rem;
+}
+
+.sr-head h1 {
+  margin: 0 0 0.4rem;
+  font-size: 2.25rem;
+  font-weight: 800;
+}
+
+.sr-head p {
+  margin: 0;
+  color: var(--color-text-muted);
+}
+
+.sr-head p strong {
+  color: var(--color-primary);
+  font-weight: 700;
+}
+
+.sr-section + .sr-section {
+  margin-top: 2.25rem;
+}
+
+.sr-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.sr-section-title {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 800;
+}
+
+.sr-section-icon {
+  color: var(--color-primary);
+  line-height: 0;
+}
+
+.sr-section-icon svg {
+  width: 1.35rem;
+  height: 1.35rem;
+}
+
+.sr-section-count {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--color-text-muted);
+}
+
+.sr-more {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--color-primary);
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.sr-more:hover {
+  text-decoration: underline;
+}
+
+.sr-more svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.sr-filter-note {
+  margin: 0 0 1rem;
+  padding: 0.7rem 1rem;
+  background-color: #eef0fe;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  color: var(--color-primary-dark);
+}
+
+/* 商品卡只有圖片與名稱（依圖 13） */
+.sr-product-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+@media (max-width: 1200px) {
+  .sr-product-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 800px) {
+  .sr-product-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .sr-product-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.sr-product {
+  display: flex;
+  flex-direction: column;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  overflow: hidden;
+  text-decoration: none;
+  color: inherit;
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.sr-product:hover {
+  box-shadow: 0 6px 18px rgba(31, 31, 46, 0.08);
+  transform: translateY(-2px);
+}
+
+.sr-product-image {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  display: block;
+  background-color: var(--color-bg);
+}
+
+.sr-product-name {
+  padding: 0.75rem 0.6rem 0.9rem;
+  text-align: center;
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+/* 角色卡依使用者決議只放文字，不放圓形頭像 */
+.sr-character-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+@media (max-width: 800px) {
+  .sr-character-list {
+    grid-template-columns: 1fr;
+  }
+}
+
+.sr-character {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 1.1rem 1.25rem;
+  text-decoration: none;
+  color: inherit;
+  transition: box-shadow 0.15s ease;
+}
+
+.sr-character:hover {
+  box-shadow: 0 6px 18px rgba(31, 31, 46, 0.08);
+}
+
+.sr-character-name {
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.sr-character-count {
+  background-color: #eef0fe;
+  color: var(--color-primary-dark);
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.22rem 0.6rem;
+  border-radius: 6px;
+}
+
+.sr-character-arrow {
+  margin-left: auto;
+  color: var(--color-text-muted);
+  line-height: 0;
+}
+
+.sr-character-arrow svg {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+/* ---------------------------------------------------------------------------
+   Auth pages — 登入／註冊（依圖 14、15）
+   Header 依使用者決議保留，卡片區塊以滿版漸層鋪底再置中卡片。
+--------------------------------------------------------------------------- */
+.auth-page {
+  /* 依使用者決議維持原本的頁面背景，不加漸層與裝飾 */
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 1.5rem 0 2rem;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 34rem;
+  background-color: var(--color-surface);
+  border-radius: 20px;
+  padding: 2.75rem 3rem 2.25rem;
+  box-shadow: 0 18px 45px rgba(60, 55, 120, 0.12);
+}
+
+.auth-brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.85rem;
+  margin-bottom: 1.75rem;
+}
+
+.auth-brand-icon {
+  width: 3.5rem;
+  height: 3.5rem;
+  object-fit: contain;
+}
+
+.auth-brand-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.auth-brand-title {
+  font-size: 1.7rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.auth-brand-subtitle {
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  color: var(--color-primary);
+}
+
+.auth-title {
+  margin: 0;
+  text-align: center;
+  font-size: 1.6rem;
+  font-weight: 800;
+}
+
+/* 標題下方的裝飾線，中央一顆小星 */
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0.85rem 0 1.75rem;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #c9c4f0, transparent);
+}
+
+.auth-divider-star {
+  color: var(--color-primary);
+  font-size: 0.8rem;
+  line-height: 1;
+}
+
+.auth-lead {
+  margin: 0 0 1.5rem;
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+  line-height: 1.7;
+}
+
+.auth-field + .auth-field {
+  margin-top: 1.1rem;
+}
+
+.auth-field label {
+  display: block;
+  margin-bottom: 0.45rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.auth-input {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.auth-input-icon {
+  position: absolute;
+  left: 1rem;
+  color: var(--color-text-muted);
+  line-height: 0;
+  pointer-events: none;
+}
+
+.auth-input-icon svg {
+  width: 1.15rem;
+  height: 1.15rem;
+}
+
+.auth-input input {
+  width: 100%;
+  height: 52px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 0 2.9rem;
+  font-size: 0.95rem;
+}
+
+.auth-input input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.auth-input-toggle {
+  position: absolute;
+  right: 0.9rem;
+  border: none;
+  background: none;
+  padding: 0.25rem;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  line-height: 0;
+}
+
+.auth-input-toggle:hover {
+  color: var(--color-primary);
+}
+
+.auth-input-toggle svg {
+  width: 1.2rem;
+  height: 1.2rem;
+}
+
+.auth-forgot {
+  display: block;
+  margin-top: 0.5rem;
+  text-align: right;
+  color: var(--color-primary);
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.auth-forgot:hover {
+  text-decoration: underline;
+}
+
+.auth-submit {
+  margin-top: 1.75rem;
+  height: 52px;
+  border-radius: 12px;
+  font-size: 1rem;
+  font-weight: 700;
+  background-image: linear-gradient(135deg, #5b4bd6 0%, #7c6cf0 100%);
+  border: none;
+}
+
+.auth-submit:hover:not(:disabled) {
+  background-image: linear-gradient(135deg, #5041c4 0%, #6f5eea 100%);
+}
+
+.auth-switch {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  margin-top: 1.1rem;
+  color: var(--color-primary);
+  font-size: 0.95rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.auth-switch:hover {
+  text-decoration: underline;
+}
+
+.auth-switch svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+@media (max-width: 560px) {
+  .auth-card {
+    padding: 2rem 1.5rem 1.75rem;
+  }
+}
+
+/* 註冊頁（圖 15）：左欄依使用者決議不做，單欄表單但卡片較寬 */
+.auth-card-wide {
+  max-width: 46rem;
+}
+
+.auth-hint {
+  display: block;
+  margin-top: 0.3rem;
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+  line-height: 1.6;
+}
+
+.auth-field > .auth-hint:first-of-type {
+  margin-top: -0.2rem;
+  margin-bottom: 0.55rem;
+}
+
+.auth-error {
+  display: block;
+  margin-top: 0.35rem;
+  color: var(--color-danger);
+  font-size: 0.8rem;
+}
+
+/* 頭像：只選檔與圓形預覽，裁切依既有決議延後統一實作 */
+.auth-avatar {
+  display: flex;
+  align-items: center;
+  gap: 1.1rem;
+  flex-wrap: wrap;
+}
+
+.auth-avatar-preview {
+  width: 5rem;
+  height: 5rem;
+  border-radius: 50%;
+  object-fit: cover;
+  background-color: var(--color-bg);
+  flex-shrink: 0;
+}
+
+.auth-avatar-empty {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed var(--color-border);
+  color: var(--color-text-muted);
+}
+
+.auth-avatar-empty svg {
+  width: 2rem;
+  height: 2rem;
+}
+
+.auth-avatar-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.auth-avatar-actions .btn {
+  padding: 0.5rem 1rem;
+  font-size: 0.88rem;
+}
+
+.auth-avatar-actions .auth-hint {
+  margin-top: 0;
+}
+
+.auth-avatar-input {
+  display: none;
+}
+
+/* 三個社群帳號並排 */
+.auth-contacts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+@media (max-width: 700px) {
+  .auth-contacts {
+    grid-template-columns: 1fr;
+  }
+}
+
+.auth-contact {
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 0.75rem 0.85rem 0.85rem;
+}
+
+.auth-contact-head {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-bottom: 0.5rem;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.auth-contact-head svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.auth-contact input {
+  width: 100%;
+  height: 40px;
+  border: 1px solid var(--color-border);
+  border-radius: 9px;
+  padding: 0 0.7rem;
+  font-size: 0.85rem;
+}
+
+.auth-contact input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.auth-info-note {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 1.1rem 0 0;
+  padding: 0.75rem 1rem;
+  background-color: #eef0fe;
+  border-radius: 10px;
+  color: var(--color-primary-dark);
+  font-size: 0.85rem;
+}
+
+.auth-after-note {
+  margin: 1rem 0 0;
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+}
+
+.auth-switch-line {
+  margin: 0.6rem 0 0;
+  text-align: center;
+  font-size: 0.95rem;
+}
+
+.auth-switch-line a {
+  margin-left: 0.35rem;
+  color: var(--color-primary);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.auth-switch-line a:hover {
+  text-decoration: underline;
+}
+
+/* Email 驗證碼欄位（欄位＋發送按鈕同一列） */
+.auth-code-row {
+  display: flex;
+  align-items: stretch;
+  gap: 0.6rem;
+}
+
+.auth-code-row .auth-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.auth-code-btn {
+  height: 52px;
+  border-radius: 12px;
+  padding: 0 1.1rem;
+  font-size: 0.88rem;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.auth-code-notice {
+  display: block;
+  margin-top: 0.35rem;
+  color: var(--color-success);
+  font-size: 0.8rem;
+  line-height: 1.6;
+}
+
+@media (max-width: 560px) {
+  .auth-code-row {
+    flex-direction: column;
+  }
+
+  .auth-code-btn {
+    width: 100%;
+  }
+}
+
+/* 同一欄位可能有多筆錯誤訊息，逐行顯示 */
+.auth-error-line {
+  display: block;
+}
+
+.auth-error-line + .auth-error-line {
+  margin-top: 0.2rem;
+}

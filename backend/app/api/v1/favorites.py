@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import PaginationParams, get_current_user, get_db
 from app.core.responses import envelope, paginated_envelope
 from app.models.user import AppUser
+from app.schemas.favorite import FavoriteSort
 from app.services import favorite_service
 
 router = APIRouter(prefix="/favorites", tags=["favorites"])
@@ -13,12 +14,13 @@ router = APIRouter(prefix="/favorites", tags=["favorites"])
 
 @router.get("/products")
 def get_favorite_products(
+    sort: FavoriteSort = FavoriteSort.CREATED_DESC,
     pagination: PaginationParams = Depends(),
     current_user: AppUser = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> dict:
     items, total = favorite_service.list_favorites(
-        db, current_user.id, pagination.page, pagination.page_size
+        db, current_user.id, pagination.page, pagination.page_size, sort
     )
     return paginated_envelope(
         [i.model_dump(mode="json") for i in items], pagination.page, pagination.page_size, total

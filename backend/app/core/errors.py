@@ -33,14 +33,32 @@ async def app_error_handler(request: Request, exc: AppError) -> JSONResponse:
     )
 
 
+# pydantic 會把自訂 validator 拋出的訊息包成 "Value error, 實際訊息"，
+# 這些字串會直接顯示給使用者，前綴要剝掉。
+_PYDANTIC_MESSAGE_PREFIXES = ("Value error, ", "Assertion failed, ")
+
+
+def _clean_message(message: str) -> str:
+    for prefix in _PYDANTIC_MESSAGE_PREFIXES:
+        if message.startswith(prefix):
+            return message[len(prefix):]
+    return message
+
+
 async def validation_error_handler(
     request: Request, exc: RequestValidationError
 ) -> JSONResponse:
     fields: dict[str, list[str]] = {}
     for error in exc.errors():
         loc = [str(part) for part in error["loc"] if part not in ("body", "query", "path")]
+        # 沒有對應欄位的錯誤（model_validator 的跨欄位檢查）歸到 "_"，
+        # 前端需把這一組顯示為整體錯誤，否則使用者會看不到任何提示。
         field_name = ".".join(loc) if loc else "_"
-        fields.setdefault(field_name, []).append(error["msg"])
+        # 一個 validator 只能拋一次錯，需要同時回報多項時以換行分隔，這裡拆回多筆
+        message = _clean_message(error["msg"])
+        fields.setdefault(field_name, []).extend(
+            part for part in message.split("\n") if part.strip()
+        )
 
     return JSONResponse(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,

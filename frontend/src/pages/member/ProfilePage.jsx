@@ -147,7 +147,7 @@ export default function ProfilePage() {
         <FormField label="Facebook" htmlFor="profile-facebook">
           <input
             id="profile-facebook"
-            placeholder="請輸入 Facebook 帳號或連結"
+            placeholder="請輸入 Facebook 連結"
             value={facebookContact}
             onChange={(event) => setFacebookContact(event.target.value)}
           />

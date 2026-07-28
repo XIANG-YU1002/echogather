@@ -6,8 +6,8 @@ def test_get_my_profile_requires_token(client):
     assert response.status_code == 401
 
 
-def test_get_my_profile_success(client):
-    user, token = register_and_login(client)
+def test_get_my_profile_success(client, db_session):
+    user, token = register_and_login(client, db_session)
 
     response = client.get("/api/v1/users/me", headers=auth_headers(token))
 
@@ -18,8 +18,8 @@ def test_get_my_profile_success(client):
     assert data["group_leader_profile"] is None
 
 
-def test_update_profile_nickname(client):
-    _, token = register_and_login(client)
+def test_update_profile_nickname(client, db_session):
+    _, token = register_and_login(client, db_session)
 
     response = client.patch(
         "/api/v1/users/me", json={"nickname": "新暱稱"}, headers=auth_headers(token)
@@ -29,16 +29,16 @@ def test_update_profile_nickname(client):
     assert response.json()["data"]["nickname"] == "新暱稱"
 
 
-def test_update_profile_requires_at_least_one_field(client):
-    _, token = register_and_login(client)
+def test_update_profile_requires_at_least_one_field(client, db_session):
+    _, token = register_and_login(client, db_session)
 
     response = client.patch("/api/v1/users/me", json={}, headers=auth_headers(token))
 
     assert response.status_code == 422
 
 
-def test_update_profile_cannot_change_email(client):
-    _, token = register_and_login(client)
+def test_update_profile_cannot_change_email(client, db_session):
+    _, token = register_and_login(client, db_session)
 
     response = client.patch(
         "/api/v1/users/me",
@@ -50,8 +50,8 @@ def test_update_profile_cannot_change_email(client):
     assert response.json()["data"]["email"] != "hacker@example.com"
 
 
-def test_update_contacts_requires_at_least_one(client):
-    _, token = register_and_login(client)
+def test_update_contacts_requires_at_least_one(client, db_session):
+    _, token = register_and_login(client, db_session)
 
     response = client.patch(
         "/api/v1/users/me/contacts",
@@ -63,8 +63,8 @@ def test_update_contacts_requires_at_least_one(client):
     assert response.json()["error"]["code"] == "CONTACT_REQUIRED"
 
 
-def test_update_contacts_success(client):
-    _, token = register_and_login(client)
+def test_update_contacts_success(client, db_session):
+    _, token = register_and_login(client, db_session)
 
     response = client.patch(
         "/api/v1/users/me/contacts",
@@ -78,8 +78,8 @@ def test_update_contacts_success(client):
     assert data["facebook_contact"] is None
 
 
-def test_update_contacts_blank_string_normalized_to_null(client):
-    _, token = register_and_login(client)
+def test_update_contacts_blank_string_normalized_to_null(client, db_session):
+    _, token = register_and_login(client, db_session)
 
     response = client.patch(
         "/api/v1/users/me/contacts",

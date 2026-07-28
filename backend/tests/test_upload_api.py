@@ -42,8 +42,8 @@ def test_upload_requires_authentication(client):
     assert response.status_code == 401
 
 
-def test_upload_avatar_success(client, uploaded_objects):
-    _, token = register_and_login(client)
+def test_upload_avatar_success(client, db_session, uploaded_objects):
+    _, token = register_and_login(client, db_session)
     files = {"file": ("avatar.png", _png_bytes(), "image/png")}
 
     response = client.post(
@@ -66,8 +66,8 @@ def test_upload_avatar_success(client, uploaded_objects):
     assert size == data["size"]
 
 
-def test_upload_activity_requires_admin(client):
-    _, token = register_and_login(client)
+def test_upload_activity_requires_admin(client, db_session):
+    _, token = register_and_login(client, db_session)
     files = {"file": ("activity.png", _png_bytes(), "image/png")}
 
     response = client.post(
@@ -98,8 +98,8 @@ def test_upload_activity_success_for_admin(client, db_session, uploaded_objects)
     assert re.fullmatch(r"activity/\d{4}/\d{2}/[0-9a-f]{32}\.webp", uploaded_objects[0][0])
 
 
-def test_upload_invalid_category(client):
-    _, token = register_and_login(client)
+def test_upload_invalid_category(client, db_session):
+    _, token = register_and_login(client, db_session)
     files = {"file": ("banner.png", _png_bytes(), "image/png")}
 
     response = client.post(
@@ -113,8 +113,8 @@ def test_upload_invalid_category(client):
     assert response.json()["error"]["code"] == "UPLOAD_CATEGORY_INVALID"
 
 
-def test_upload_unsupported_content_type(client):
-    _, token = register_and_login(client)
+def test_upload_unsupported_content_type(client, db_session):
+    _, token = register_and_login(client, db_session)
     files = {"file": ("notes.txt", b"just some text", "text/plain")}
 
     response = client.post(
@@ -128,8 +128,8 @@ def test_upload_unsupported_content_type(client):
     assert response.json()["error"]["code"] == "UPLOAD_FILE_TYPE_NOT_SUPPORTED"
 
 
-def test_upload_corrupt_image_rejected(client):
-    _, token = register_and_login(client)
+def test_upload_corrupt_image_rejected(client, db_session):
+    _, token = register_and_login(client, db_session)
     files = {"file": ("avatar.png", b"not-really-a-png-file", "image/png")}
 
     response = client.post(

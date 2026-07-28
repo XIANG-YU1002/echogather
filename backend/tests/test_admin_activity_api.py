@@ -8,8 +8,8 @@ def _admin_headers(client, db_session):
     return auth_headers(login(client, admin.email, "Passw0rd1"))
 
 
-def test_non_admin_cannot_access(client):
-    _, token = register_and_login(client)
+def test_non_admin_cannot_access(client, db_session):
+    _, token = register_and_login(client, db_session)
     response = client.get("/api/v1/admin/activities", headers=auth_headers(token))
     assert response.status_code == 403
     assert response.json()["error"]["code"] == "PERMISSION_DENIED"

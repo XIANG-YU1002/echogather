@@ -11,6 +11,8 @@ import GroupBuyDetailPage from "../pages/GroupBuyDetailPage.jsx";
 import GroupLeaderListPage from "../pages/GroupLeaderListPage.jsx";
 import GroupLeaderProfilePage from "../pages/GroupLeaderProfilePage.jsx";
 import LoginPage from "../pages/LoginPage.jsx";
+import ForgotPasswordPage from "../pages/ForgotPasswordPage.jsx";
+import ResetPasswordPage from "../pages/ResetPasswordPage.jsx";
 import RegisterPage from "../pages/RegisterPage.jsx";
 import NotFoundPage from "../pages/NotFoundPage.jsx";
 import AdminDashboardPage from "../pages/admin/AdminDashboardPage.jsx";
@@ -46,6 +48,8 @@ export default function AppRoutes() {
         <Route path="/" element={<HomePage />} />
         <Route path="/search" element={<SearchPage />} />
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/activities/:activityId" element={<ActivityDetailPage />} />
         <Route path="/products/:productId" element={<ProductDetailPage />} />

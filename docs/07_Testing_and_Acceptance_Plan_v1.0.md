@@ -287,7 +287,9 @@
 | AUTH-007 | P0 | 正確登入與 Session 建立 | 有效會員 | 輸入正確 Email、密碼；登入後取得 auth/me | 200；Access Token 有效 8 小時；auth/me 回傳正確會員與 permissions | BR 6.5；API Login／auth/me | Not Run |
 | AUTH-008 | P0 | 錯誤登入不洩漏帳號存在 | 一個存在與一個不存在 Email | 分別輸入錯誤密碼 | 兩者皆 401 AUTH_INVALID_CREDENTIALS，訊息一致 | BR-AUTH-005、008 | Not Run |
 | AUTH-009 | P1 | Token 到期處理 | 過期 Token；目前頁有 redirectPath | 進入受保護頁或提交操作 | 401 AUTH_TOKEN_EXPIRED；清除登入狀態；導向登入；登入後回原頁；敏感操作不自動重送 | BR 6.5～6.6 | Not Run |
-| AUTH-010 | P1 | 註冊成功不自動登入 | 無 | 完成註冊後檢查 sessionStorage 與頁面 | sessionStorage 無 Token；顯示登入頁 | BR 6.4 | Not Run |
+| AUTH-010 | P1 | 註冊成功後自動登入 | 無（2026-07-28 修訂，原為「不自動登入」） | 完成註冊後檢查 sessionStorage 與頁面 | sessionStorage 有 Token；導向首頁且為已登入狀態 | BR 6.4 | Not Run |
+| AUTH-013 | P1 | 註冊需通過 Email 驗證碼 | 未取得驗證碼 | 直接送出註冊 | 422；帶錯誤驗證碼則 400 VERIFICATION_CODE_INVALID；帳號未建立 | BR 6.8-1 | Not Run |
+| AUTH-014 | P2 | 驗證碼寄送限流與單次使用 | 同一 Email | 連續兩次寄送；以同一組碼註冊兩次 | 第二次寄送 429 VERIFICATION_CODE_TOO_FREQUENT；驗證碼消耗後不可重用 | BR 6.8-1 | Not Run |
 | AUTH-011 | P1 | Email 不可由會員修改 | 已登入會員 | PATCH users/me 額外傳入 email | 422 或忽略禁止欄位；資料庫 Email 不變 | BR-AUTH-004；API Current User | Not Run |
 | AUTH-012 | P0 | 密碼與 Token 不出現在 Log／Response | 可檢視測試 Log | 執行成功與失敗登入 | Response、錯誤與 Log 不含明文密碼、hash、完整 Token | BR-AUTH-007、009；Security | Not Run |
 | PROF-001 | P1 | 會員讀取自己的完整資料 | M-01 已登入 | GET users/me | 回傳 Email、暱稱、頭像、私人聯絡方式與申請／團主摘要；不包含密碼 | BR 7.1～7.5 | Not Run |

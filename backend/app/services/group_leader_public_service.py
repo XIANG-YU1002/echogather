@@ -14,6 +14,7 @@ from app.repositories import (
 from app.schemas.announcement import PublicAnnouncementItem
 from app.schemas.group_buy import GroupBuyActivitySummary, PublicGroupLeaderGroupBuyItem
 from app.schemas.group_leader import (
+    GroupLeaderSort,
     GroupLeaderStatistics,
     PublicContacts,
     PublicGroupLeaderProfileResponse,
@@ -31,15 +32,19 @@ def _load_complete_profile_or_404(db: Session, group_leader_profile_id: uuid.UUI
 
 
 def list_public_profiles(
-    db: Session, *, keyword: str | None, page: int, page_size: int
+    db: Session,
+    *,
+    keyword: str | None,
+    page: int,
+    page_size: int,
+    sort: GroupLeaderSort = GroupLeaderSort.CREATED_DESC,
 ) -> tuple[list[PublicGroupLeaderProfileResponse], int]:
-    profiles, total = group_leader_repository.list_public_profiles(
-        db, keyword=keyword, page=page, page_size=page_size
+    rows, total = group_leader_repository.list_public_profiles(
+        db, keyword=keyword, page=page, page_size=page_size, sort=sort
     )
     items = []
-    for profile in profiles:
+    for profile, group_buy_count, completed_order_count in rows:
         user = user_repository.get_by_id(db, profile.user_id)
-        statistics = group_leader_repository.get_public_statistics(db, profile.id)
         items.append(
             PublicGroupLeaderProfileResponse(
                 id=profile.id,
@@ -52,7 +57,10 @@ def list_public_profiles(
                     line=profile.line_contact,
                 ),
                 created_at=profile.created_at,
-                statistics=GroupLeaderStatistics(**statistics),
+                statistics=GroupLeaderStatistics(
+                    group_buy_count=group_buy_count,
+                    completed_order_count=completed_order_count,
+                ),
                 default_rules=profile.default_rules,
             )
         )

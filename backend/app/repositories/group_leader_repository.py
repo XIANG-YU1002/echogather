@@ -8,6 +8,7 @@ from app.models.group_buy import GroupBuy
 from app.models.group_leader import GroupLeaderApplication, GroupLeaderProfile
 from app.models.order import GroupOrder
 from app.models.user import AppUser
+from app.schemas.group_leader import GroupLeaderSort
 
 
 def get_profile_by_user_id(db: Session, user_id: uuid.UUID) -> GroupLeaderProfile | None:
@@ -125,21 +126,58 @@ def create_profile(db: Session, user_id: uuid.UUID) -> GroupLeaderProfile:
 
 
 def list_public_profiles(
-    db: Session, *, keyword: str | None, page: int, page_size: int
-) -> tuple[list[GroupLeaderProfile], int]:
-    """公開團主列表：僅列出已完成公開資料（display_name 已設定）的團主。"""
-    stmt = select(GroupLeaderProfile).where(GroupLeaderProfile.display_name.is_not(None))
+    db: Session,
+    *,
+    keyword: str | None,
+    page: int,
+    page_size: int,
+    sort: GroupLeaderSort = GroupLeaderSort.CREATED_DESC,
+) -> tuple[list[tuple[GroupLeaderProfile, int, int]], int]:
+    """公開團主列表：僅列出已完成公開資料（display_name 已設定）的團主。
+
+    統計值以相關子查詢一併取回（而非逐筆再查一次），除了讓「依開團數／完成訂單數」
+    排序得以在資料庫端完成，也順帶消掉原本每頁一筆一查的 N+1。
+    """
+    group_buy_count = (
+        select(func.count())
+        .select_from(GroupBuy)
+        .where(GroupBuy.group_leader_profile_id == GroupLeaderProfile.id)
+        .correlate(GroupLeaderProfile)
+        .scalar_subquery()
+    )
+    completed_order_count = (
+        select(func.count())
+        .select_from(GroupOrder)
+        .join(GroupBuy, GroupBuy.id == GroupOrder.group_buy_id)
+        .where(
+            GroupBuy.group_leader_profile_id == GroupLeaderProfile.id,
+            GroupOrder.status == OrderStatus.COMPLETED,
+        )
+        .correlate(GroupLeaderProfile)
+        .scalar_subquery()
+    )
+
+    stmt = select(GroupLeaderProfile, group_buy_count, completed_order_count).where(
+        GroupLeaderProfile.display_name.is_not(None)
+    )
     if keyword:
         stmt = stmt.where(GroupLeaderProfile.display_name.ilike(f"%{keyword}%"))
 
     total = db.execute(select(func.count()).select_from(stmt.subquery())).scalar_one()
-    rows = (
-        db.execute(
-            stmt.order_by(GroupLeaderProfile.created_at.desc())
-            .offset((page - 1) * page_size)
-            .limit(page_size)
-        )
-        .scalars()
-        .all()
-    )
-    return list(rows), total
+
+    if sort is GroupLeaderSort.CREATED_ASC:
+        order_by = [GroupLeaderProfile.created_at.asc()]
+    elif sort is GroupLeaderSort.GROUP_BUY_DESC:
+        order_by = [group_buy_count.desc(), GroupLeaderProfile.created_at.desc()]
+    elif sort is GroupLeaderSort.COMPLETED_ORDER_DESC:
+        order_by = [completed_order_count.desc(), GroupLeaderProfile.created_at.desc()]
+    else:
+        order_by = [GroupLeaderProfile.created_at.desc()]
+
+    rows = db.execute(
+        # 加上 id 為次要排序鍵，避免同分項目在跨頁時順序飄移造成重複／遺漏
+        stmt.order_by(*order_by, GroupLeaderProfile.id.asc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    ).all()
+    return [(row[0], row[1], row[2]) for row in rows], total

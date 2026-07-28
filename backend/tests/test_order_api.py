@@ -33,7 +33,7 @@ def _add_follow_list_item(client, headers, group_buy_product_id, quantity):
 
 def test_create_order_success(client, db_session):
     _, group_buy_product = _setup_group_buy_product(db_session, max_quantity=5, unit_price="200.00")
-    _, token = register_and_login(client)
+    _, token = register_and_login(client, db_session)
     headers = auth_headers(token)
     _add_follow_list_item(client, headers, group_buy_product.id, 2)
 
@@ -52,7 +52,7 @@ def test_create_order_success(client, db_session):
 
 def test_create_order_requires_rules_accepted(client, db_session):
     _, group_buy_product = _setup_group_buy_product(db_session)
-    _, token = register_and_login(client)
+    _, token = register_and_login(client, db_session)
     headers = auth_headers(token)
     _add_follow_list_item(client, headers, group_buy_product.id, 1)
 
@@ -62,8 +62,8 @@ def test_create_order_requires_rules_accepted(client, db_session):
     assert response.json()["error"]["code"] == "RULES_NOT_ACCEPTED"
 
 
-def test_create_order_empty_follow_list(client):
-    _, token = register_and_login(client)
+def test_create_order_empty_follow_list(client, db_session):
+    _, token = register_and_login(client, db_session)
     response = client.post(
         "/api/v1/orders", json={"rules_accepted": True}, headers=auth_headers(token)
     )
@@ -74,7 +74,7 @@ def test_create_order_empty_follow_list(client):
 def test_create_order_insufficient_quantity_keeps_follow_list(client, db_session):
     group_buy, group_buy_product = _setup_group_buy_product(db_session, max_quantity=2)
     buyer = create_user(db_session)
-    _, token = register_and_login(client)
+    _, token = register_and_login(client, db_session)
     headers = auth_headers(token)
     _add_follow_list_item(client, headers, group_buy_product.id, 2)
 
@@ -94,7 +94,7 @@ def test_create_order_insufficient_quantity_keeps_follow_list(client, db_session
 
 def test_get_my_orders_list_and_detail(client, db_session):
     _, group_buy_product = _setup_group_buy_product(db_session, max_quantity=5, unit_price="150.00")
-    _, token = register_and_login(client)
+    _, token = register_and_login(client, db_session)
     headers = auth_headers(token)
     _add_follow_list_item(client, headers, group_buy_product.id, 3)
     create_response = client.post(
@@ -141,7 +141,7 @@ def test_order_number_is_daily_serial(client, db_session):
 
     numbers = []
     for _ in range(2):
-        _, token = register_and_login(client)
+        _, token = register_and_login(client, db_session)
         headers = auth_headers(token)
         _add_follow_list_item(client, headers, group_buy_product.id, 1)
         response = client.post("/api/v1/orders", json={"rules_accepted": True}, headers=headers)
@@ -166,7 +166,7 @@ def test_get_my_orders_filters(client, db_session):
     )
     group_buy_product = create_group_buy_product(db_session, group_buy, product, max_quantity=5)
 
-    _, token = register_and_login(client)
+    _, token = register_and_login(client, db_session)
     headers = auth_headers(token)
     _add_follow_list_item(client, headers, group_buy_product.id, 1)
     client.post("/api/v1/orders", json={"rules_accepted": True}, headers=headers)
@@ -197,14 +197,14 @@ def test_get_my_orders_filters(client, db_session):
 
 def test_order_detail_not_visible_to_other_member(client, db_session):
     _, group_buy_product = _setup_group_buy_product(db_session)
-    _, token = register_and_login(client)
+    _, token = register_and_login(client, db_session)
     headers = auth_headers(token)
     _add_follow_list_item(client, headers, group_buy_product.id, 1)
     order_id = client.post(
         "/api/v1/orders", json={"rules_accepted": True}, headers=headers
     ).json()["data"]["id"]
 
-    _, other_token = register_and_login(client)
+    _, other_token = register_and_login(client, db_session)
     response = client.get(f"/api/v1/orders/{order_id}", headers=auth_headers(other_token))
 
     assert response.status_code == 404
@@ -213,7 +213,7 @@ def test_order_detail_not_visible_to_other_member(client, db_session):
 
 def test_create_cancellation_request_success(client, db_session):
     _, group_buy_product = _setup_group_buy_product(db_session)
-    _, token = register_and_login(client)
+    _, token = register_and_login(client, db_session)
     headers = auth_headers(token)
     _add_follow_list_item(client, headers, group_buy_product.id, 1)
     order_id = client.post(
@@ -234,7 +234,7 @@ def test_create_cancellation_request_success(client, db_session):
 
 def test_create_cancellation_request_duplicate_pending(client, db_session):
     _, group_buy_product = _setup_group_buy_product(db_session)
-    _, token = register_and_login(client)
+    _, token = register_and_login(client, db_session)
     headers = auth_headers(token)
     _add_follow_list_item(client, headers, group_buy_product.id, 1)
     order_id = client.post(
@@ -252,7 +252,7 @@ def test_create_cancellation_request_duplicate_pending(client, db_session):
 
 def test_create_cancellation_request_blank_reason_normalized_to_null(client, db_session):
     _, group_buy_product = _setup_group_buy_product(db_session)
-    _, token = register_and_login(client)
+    _, token = register_and_login(client, db_session)
     headers = auth_headers(token)
     _add_follow_list_item(client, headers, group_buy_product.id, 1)
     order_id = client.post(

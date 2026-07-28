@@ -20,8 +20,8 @@ def _setup_group_buy_product(db_session, **overrides):
     return group_buy, group_buy_product
 
 
-def test_get_follow_list_when_none_exists(client):
-    _, token = register_and_login(client)
+def test_get_follow_list_when_none_exists(client, db_session):
+    _, token = register_and_login(client, db_session)
     response = client.get("/api/v1/follow-list", headers=auth_headers(token))
     assert response.status_code == 200
     assert response.json()["data"] is None
@@ -29,7 +29,7 @@ def test_get_follow_list_when_none_exists(client):
 
 def test_add_item_creates_follow_list(client, db_session):
     _, group_buy_product = _setup_group_buy_product(db_session, max_quantity=5, unit_price="100.00")
-    _, token = register_and_login(client)
+    _, token = register_and_login(client, db_session)
     headers = auth_headers(token)
 
     response = client.post(
@@ -49,7 +49,7 @@ def test_add_item_creates_follow_list(client, db_session):
 
 def test_add_same_product_accumulates_quantity(client, db_session):
     _, group_buy_product = _setup_group_buy_product(db_session, max_quantity=10)
-    _, token = register_and_login(client)
+    _, token = register_and_login(client, db_session)
     headers = auth_headers(token)
 
     client.post(
@@ -71,7 +71,7 @@ def test_add_same_product_accumulates_quantity(client, db_session):
 
 def test_add_item_insufficient_quantity(client, db_session):
     _, group_buy_product = _setup_group_buy_product(db_session, max_quantity=2)
-    _, token = register_and_login(client)
+    _, token = register_and_login(client, db_session)
 
     response = client.post(
         "/api/v1/follow-list/items",
@@ -85,7 +85,7 @@ def test_add_item_insufficient_quantity(client, db_session):
 
 def test_add_item_invalid_quantity(client, db_session):
     _, group_buy_product = _setup_group_buy_product(db_session)
-    _, token = register_and_login(client)
+    _, token = register_and_login(client, db_session)
 
     response = client.post(
         "/api/v1/follow-list/items",
@@ -100,7 +100,7 @@ def test_add_item_invalid_quantity(client, db_session):
 def test_add_item_from_different_group_buy_conflicts(client, db_session):
     _, gbp1 = _setup_group_buy_product(db_session)
     _, gbp2 = _setup_group_buy_product(db_session)
-    _, token = register_and_login(client)
+    _, token = register_and_login(client, db_session)
     headers = auth_headers(token)
 
     client.post(
@@ -121,7 +121,7 @@ def test_add_item_from_different_group_buy_conflicts(client, db_session):
 def test_add_item_replace_existing(client, db_session):
     _, gbp1 = _setup_group_buy_product(db_session)
     _, gbp2 = _setup_group_buy_product(db_session)
-    _, token = register_and_login(client)
+    _, token = register_and_login(client, db_session)
     headers = auth_headers(token)
 
     client.post(
@@ -143,7 +143,7 @@ def test_add_item_replace_existing(client, db_session):
 
 def test_update_item_quantity(client, db_session):
     _, group_buy_product = _setup_group_buy_product(db_session, max_quantity=10, unit_price="50.00")
-    _, token = register_and_login(client)
+    _, token = register_and_login(client, db_session)
     headers = auth_headers(token)
 
     add_response = client.post(
@@ -166,7 +166,7 @@ def test_update_item_quantity(client, db_session):
 
 def test_remove_item_deletes_empty_follow_list(client, db_session):
     _, group_buy_product = _setup_group_buy_product(db_session)
-    _, token = register_and_login(client)
+    _, token = register_and_login(client, db_session)
     headers = auth_headers(token)
 
     add_response = client.post(
@@ -183,8 +183,8 @@ def test_remove_item_deletes_empty_follow_list(client, db_session):
     assert get_response.json()["data"] is None
 
 
-def test_clear_follow_list_idempotent(client):
-    _, token = register_and_login(client)
+def test_clear_follow_list_idempotent(client, db_session):
+    _, token = register_and_login(client, db_session)
     response = client.delete("/api/v1/follow-list", headers=auth_headers(token))
     assert response.status_code == 204
 
@@ -192,7 +192,7 @@ def test_clear_follow_list_idempotent(client):
 def test_follow_list_marks_not_submittable_when_quantity_occupied(client, db_session):
     group_buy, group_buy_product = _setup_group_buy_product(db_session, max_quantity=2)
     buyer = create_user(db_session)
-    _, token = register_and_login(client)
+    _, token = register_and_login(client, db_session)
     headers = auth_headers(token)
 
     client.post(

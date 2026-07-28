@@ -10,7 +10,7 @@ def _admin_headers(client, db_session):
 
 def test_get_applications_and_detail(client, db_session):
     admin_headers = _admin_headers(client, db_session)
-    _, member_token = register_and_login(client)
+    _, member_token = register_and_login(client, db_session)
     member_headers = auth_headers(member_token)
     client.post("/api/v1/group-leader-applications", headers=member_headers)
 
@@ -31,7 +31,7 @@ def test_get_applications_and_detail(client, db_session):
 
 def test_approve_application_creates_profile_and_notification(client, db_session):
     admin_headers = _admin_headers(client, db_session)
-    _, member_token = register_and_login(client)
+    _, member_token = register_and_login(client, db_session)
     member_headers = auth_headers(member_token)
     application_id = client.post(
         "/api/v1/group-leader-applications", headers=member_headers
@@ -56,7 +56,7 @@ def test_approve_application_creates_profile_and_notification(client, db_session
 
 def test_approve_application_twice_conflicts(client, db_session):
     admin_headers = _admin_headers(client, db_session)
-    _, member_token = register_and_login(client)
+    _, member_token = register_and_login(client, db_session)
     member_headers = auth_headers(member_token)
     application_id = client.post(
         "/api/v1/group-leader-applications", headers=member_headers
@@ -74,7 +74,7 @@ def test_approve_application_twice_conflicts(client, db_session):
 
 def test_reject_application_allows_reapply(client, db_session):
     admin_headers = _admin_headers(client, db_session)
-    _, member_token = register_and_login(client)
+    _, member_token = register_and_login(client, db_session)
     member_headers = auth_headers(member_token)
     application_id = client.post(
         "/api/v1/group-leader-applications", headers=member_headers
@@ -95,8 +95,8 @@ def test_reject_application_allows_reapply(client, db_session):
     assert reapply_response.status_code == 201
 
 
-def test_non_admin_cannot_review(client):
-    _, token = register_and_login(client)
+def test_non_admin_cannot_review(client, db_session):
+    _, token = register_and_login(client, db_session)
     response = client.get(
         "/api/v1/admin/group-leader-applications", headers=auth_headers(token)
     )
