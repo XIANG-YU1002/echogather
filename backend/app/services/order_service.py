@@ -165,7 +165,10 @@ def create_order(db: Session, user: AppUser, rules_accepted: bool) -> CreateOrde
     )
 
 
-def _build_item_summary(items) -> str:
+def build_item_summary(items) -> str:
+    """商品摘要文字。會員端訂單列表與團主端訂單列表共用同一種寫法。"""
+    if not items:
+        return ""
     first_name = items[0].product_name_snapshot
     if len(items) == 1:
         return first_name
@@ -203,7 +206,7 @@ def get_my_orders(
                 group_leader_name=order.group_leader_name_snapshot,
                 activity_name=order.activity_name_snapshot,
                 representative_image_url=items[0].image_url_snapshot if items else "",
-                item_summary=_build_item_summary(items) if items else "",
+                item_summary=build_item_summary(items),
                 item_count=len(items),
                 product_total_amount=order.product_total_amount,
                 status=order.status,

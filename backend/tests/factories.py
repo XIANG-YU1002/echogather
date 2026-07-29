@@ -159,12 +159,20 @@ def create_order_with_item(
     quantity: int,
     *,
     status: OrderStatus = OrderStatus.PAID,
+    created_at: datetime | None = None,
 ) -> GroupOrder:
+    """建立一張含單一商品的訂單。
+
+    測試若會斷言訂單的先後順序（先喊先得），務必指定 created_at：它平常由
+    server_default now() 產生，而 PostgreSQL 的 now() 在同一交易內是固定值，
+    同一個測試裡建立的多張訂單時間會完全相同，排序就落到 UUID tie-break 而變隨機。
+    """
     order = GroupOrder(
         order_number=f"ORD{uuid.uuid4().hex[:12].upper()}",
         user_id=user.id,
         group_buy_id=group_buy.id,
         status=status,
+        **({"created_at": created_at} if created_at is not None else {}),
         product_total_amount=str(group_buy_product.unit_price * quantity),
         group_leader_name_snapshot="團主快照",
         activity_name_snapshot="活動快照",

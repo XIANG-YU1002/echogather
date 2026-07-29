@@ -1,7 +1,16 @@
 import { apiRequest } from "./client.js";
 
 export function getGroupLeaderOrders(token, params = {}) {
-  const { groupBuyId, activityId, status, hasPendingCancellation, keyword, page = 1, pageSize = 20 } = params;
+  const {
+    groupBuyId,
+    activityId,
+    status,
+    hasPendingCancellation,
+    keyword,
+    newestFirst,
+    page = 1,
+    pageSize = 20,
+  } = params;
   return apiRequest("/group-leader/orders", {
     token,
     params: {
@@ -10,6 +19,7 @@ export function getGroupLeaderOrders(token, params = {}) {
       status,
       has_pending_cancellation: hasPendingCancellation,
       keyword,
+      newest_first: newestFirst,
       page,
       page_size: pageSize,
     },

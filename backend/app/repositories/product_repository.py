@@ -26,6 +26,27 @@ def get_images(db: Session, product_id: uuid.UUID) -> list[ProductImage]:
     return db.execute(stmt).scalars().all()
 
 
+def get_characters_for_products(
+    db: Session, product_ids: list[uuid.UUID]
+) -> dict[uuid.UUID, list[Character]]:
+    """一次取回多個商品的角色，避免商品列表逐筆再查一次（Supabase 在 ap-south-1，往返成本高）。
+
+    無角色的商品不會出現在回傳的 dict 中，呼叫端以空清單處理。
+    """
+    if not product_ids:
+        return {}
+    stmt = (
+        select(ProductCharacter.product_id, Character)
+        .join(Character, Character.id == ProductCharacter.character_id)
+        .where(ProductCharacter.product_id.in_(product_ids))
+        .order_by(Character.name.asc())
+    )
+    grouped: dict[uuid.UUID, list[Character]] = {}
+    for product_id, character in db.execute(stmt).all():
+        grouped.setdefault(product_id, []).append(character)
+    return grouped
+
+
 def get_characters(db: Session, product_id: uuid.UUID) -> list[Character]:
     stmt = (
         select(Character)

@@ -12,6 +12,12 @@
   --radius: 8px;
 }
 
+/* 勾選框與單選圓鈕一律用品牌主色，否則各瀏覽器會用自己的預設藍 */
+input[type="radio"],
+input[type="checkbox"] {
+  accent-color: var(--color-primary);
+}
+
 .container {
   max-width: 1440px;
   margin: 0 auto;
@@ -368,6 +374,8 @@
   overflow-x: auto;
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
+  /* 表格原本沒有底色，透明會直接透出頁面灰底，看起來像沒有卡片 */
+  background-color: #fff;
 }
 
 .table {
@@ -394,6 +402,7 @@
 .table tbody tr:last-child td {
   border-bottom: none;
 }
+
 
 /* Character tags (product list 關聯角色) */
 .char-tags {
@@ -809,6 +818,11 @@ a.stat-card--icon:hover {
   background-color: #fdeede;
   color: #e08a2b;
 }
+/* 依圖 20：即將截止用紅色，與其他三張卡區隔出急迫性 */
+.dash-icon.red {
+  background-color: #fdeaea;
+  color: #d0453f;
+}
 
 /* Dashboard: sections */
 .dash-section {
@@ -897,6 +911,8 @@ a.stat-card--icon:hover {
   width: 2rem;
   height: 2rem;
   font-size: 0.85rem;
+  /* 放在 flex 容器（例如訂單列表的會員欄）時不可被長暱稱壓扁成橢圓 */
+  flex-shrink: 0;
 }
 
 /* Breadcrumb */

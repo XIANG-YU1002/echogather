@@ -1,7 +1,10 @@
 import { apiRequest } from "./client.js";
 
-export function getMyAnnouncements(token, { page = 1, pageSize = 20 } = {}) {
-  return apiRequest("/group-leader/announcements", { token, params: { page, page_size: pageSize } });
+export function getMyAnnouncements(token, { groupBuyId, page = 1, pageSize = 20 } = {}) {
+  return apiRequest("/group-leader/announcements", {
+    token,
+    params: { group_buy_id: groupBuyId, page, page_size: pageSize },
+  });
 }
 
 export function createAnnouncement(payload, token) {

@@ -4,16 +4,16 @@ import uuid
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.models.enums import GroupLeaderApplicationStatus, UserRole
-from app.schemas.common import UTCDateTime, normalize_optional_text
+from app.schemas.common import (
+    FACEBOOK_URL_ERROR,
+    UTCDateTime,
+    is_facebook_url,
+    normalize_optional_text,
+)
 
 _EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 _PASSWORD_HAS_LETTER = re.compile(r"[A-Za-z]")
 _PASSWORD_HAS_DIGIT = re.compile(r"\d")
-# Facebook 欄位填的是個人頁連結。https:// 與 www. 皆可省略（既有資料就有
-# facebook.com/xxx 這種寫法），但不接受只填帳號名稱。
-_FACEBOOK_URL_PATTERN = re.compile(
-    r"^(https?://)?([\w-]+\.)?(facebook\.com|fb\.com|fb\.me)/\S+$", re.IGNORECASE
-)
 
 
 def validate_password_strength(value: str) -> str:
@@ -42,10 +42,8 @@ class ContactFieldsMixin(BaseModel):
     def _validate_facebook_url(cls, value: str | None) -> str | None:
         if value is None:
             return None
-        if not _FACEBOOK_URL_PATTERN.match(value):
-            raise ValueError(
-                "請輸入 Facebook 連結（例如 https://www.facebook.com/yourname）。"
-            )
+        if not is_facebook_url(value):
+            raise ValueError(FACEBOOK_URL_ERROR)
         return value
 
 

@@ -1,16 +1,21 @@
+import uuid
+
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
-from app.models.enums import GroupBuyStatus, OrderStatus
+from app.models.enums import PENDING_ORDER_STATUSES, GroupBuyStatus
 from app.models.group_leader import GroupLeaderProfile
 from app.repositories import cancellation_repository, group_buy_repository, group_leader_repository, order_repository
+from app.schemas.group_leader_group_buy import GroupBuyOwnerListItem
 from app.schemas.group_leader_profile import (
+    DashboardActivityGroup,
     DashboardCard,
     DashboardResponse,
     GroupLeaderProfileOwnerResponse,
     UpdateDefaultRulesRequest,
     UpdateGroupLeaderProfileRequest,
 )
+from app.services import group_leader_group_buy_service
 from app.services.group_leader_service import is_profile_complete
 
 
@@ -78,37 +83,28 @@ def update_default_rules(
 
 
 def get_dashboard(db: Session, profile: GroupLeaderProfile) -> DashboardResponse:
-    """依 API Design §22.4：只回傳簡化統計與可點擊篩選條件。"""
+    """依 API Design §22.4 與圖 20：統計卡＋依活動分組的目前開團。
+
+    圖 20 四張卡皆有「較昨日 +6 ↗」，但資料庫沒有每日統計快照，算不出昨天的數字，
+    依使用者裁決不做該行（見 docs/目前進度.txt 第 6 批）。
+    """
     open_group_buys = group_buy_repository.count_by_group_leader_and_status(
         db, profile.id, GroupBuyStatus.OPEN
     )
-    pending_confirmation_orders = order_repository.count_for_leader_by_status(
-        db, profile.id, OrderStatus.PENDING_CONFIRMATION
-    )
-    pending_payment_orders = order_repository.count_for_leader_by_status(
-        db, profile.id, OrderStatus.PENDING_PAYMENT
+    # 依使用者 2026-07-29 說明：待確認與待付款都是團主要處理的，合計為一張「待處理訂單」卡。
+    pending_orders = order_repository.count_for_leader_by_statuses(
+        db, profile.id, PENDING_ORDER_STATUSES
     )
     pending_cancellation_requests = cancellation_repository.count_pending_for_leader(db, profile.id)
+    upcoming_deadline = group_buy_repository.count_upcoming_deadline(db, profile.id)
 
     return DashboardResponse(
         cards=[
             DashboardCard(
-                key="open_group_buys",
-                label="進行中開團",
-                count=open_group_buys,
-                target_url="/group-leader/group-buys?status=open",
-            ),
-            DashboardCard(
-                key="pending_confirmation_orders",
-                label="待確認訂單",
-                count=pending_confirmation_orders,
-                target_url="/group-leader/orders?status=pending_confirmation",
-            ),
-            DashboardCard(
-                key="pending_payment_orders",
-                label="待付款訂單",
-                count=pending_payment_orders,
-                target_url="/group-leader/orders?status=pending_payment",
+                key="pending_orders",
+                label="待處理訂單",
+                count=pending_orders,
+                target_url="/group-leader/orders?status=pending",
             ),
             DashboardCard(
                 key="pending_cancellation_requests",
@@ -116,5 +112,38 @@ def get_dashboard(db: Session, profile: GroupLeaderProfile) -> DashboardResponse
                 count=pending_cancellation_requests,
                 target_url="/group-leader/orders?has_pending_cancellation=true",
             ),
-        ]
+            DashboardCard(
+                key="open_group_buys",
+                label="進行中開團",
+                count=open_group_buys,
+                target_url="/group-leader/group-buys?status=open",
+            ),
+            DashboardCard(
+                key="upcoming_deadline_group_buys",
+                label=f"即將截止（{group_buy_repository.UPCOMING_DEADLINE_DAYS} 天內）",
+                count=upcoming_deadline,
+                target_url="/group-leader/group-buys?status=open",
+            ),
+        ],
+        current_group_buys=_group_by_activity(
+            group_leader_group_buy_service.get_my_open_group_buys(db, profile)
+        ),
     )
+
+
+def _group_by_activity(items: list[GroupBuyOwnerListItem]) -> list[DashboardActivityGroup]:
+    """把開團清單依活動分組，活動順序沿用來源排序（最早截止的活動排前面）。"""
+    groups: dict[uuid.UUID, DashboardActivityGroup] = {}
+    for item in items:
+        group = groups.get(item.activity.id)
+        if group is None:
+            group = DashboardActivityGroup(
+                activity_id=item.activity.id,
+                activity_name=item.activity.name,
+                activity_image_url=item.activity.image_url,
+                activity_status=item.activity.status,
+                group_buys=[],
+            )
+            groups[item.activity.id] = group
+        group.group_buys.append(item)
+    return list(groups.values())

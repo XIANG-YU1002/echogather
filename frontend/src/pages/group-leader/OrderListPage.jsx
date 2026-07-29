@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { getGroupLeaderOrders, markAllOrdersShipped } from "../../api/groupLeaderOrders.js";
+import { getMyGroupBuys } from "../../api/groupLeaderGroupBuys.js";
 import { useAuth } from "../../context/AuthContext.jsx";
-import { ApiError } from "../../api/client.js";
+import { ApiError, resolveMediaUrl } from "../../api/client.js";
 import Alert from "../../components/common/Alert.jsx";
 import Button from "../../components/common/Button.jsx";
 import ConfirmModal from "../../components/common/ConfirmModal.jsx";
@@ -11,7 +12,53 @@ import ErrorState from "../../components/common/ErrorState.jsx";
 import PageLoader from "../../components/common/PageLoader.jsx";
 import Pagination from "../../components/common/Pagination.jsx";
 import StatusBadge from "../../components/common/StatusBadge.jsx";
+import {
+  AlertTriangleIcon,
+  BagIcon,
+  CheckCircleIcon,
+  ClipboardIcon,
+  CreditCardIcon,
+  HourglassIcon,
+  SearchIcon,
+  TagIcon,
+} from "../../components/common/icons.jsx";
 
+// 依圖 25：六張統計卡。key 對應後端 summary 欄位；點擊切換狀態篩選。
+const SUMMARY_CARDS = [
+  {
+    key: "pending_confirmation",
+    label: "待確認",
+    status: "pending_confirmation",
+    Icon: ClipboardIcon,
+    tone: "purple",
+  },
+  {
+    key: "pending_payment",
+    label: "待付款",
+    status: "pending_payment",
+    Icon: BagIcon,
+    tone: "orange",
+  },
+  { key: "paid", label: "已付款", status: "paid", Icon: CreditCardIcon, tone: "blue" },
+  { key: "shipped", label: "已出貨", status: "shipped", Icon: TagIcon, tone: "green" },
+  {
+    key: "completed",
+    label: "已完成",
+    status: "completed",
+    Icon: CheckCircleIcon,
+    tone: "green",
+  },
+  {
+    key: "pending_cancellation",
+    label: "待處理取消申請",
+    Icon: HourglassIcon,
+    tone: "red",
+    cancellationFilter: true,
+  },
+];
+
+// 不放「待處理」——它就是待確認＋待付款，兩者已各有頁籤（使用者 2026-07-29 指示）。
+// 但儀表板的「待處理訂單」卡仍會帶 ?status=pending 進來，該情況以提示條說明。
 const STATUS_TABS = [
   { value: undefined, label: "全部" },
   { value: "pending_confirmation", label: "待確認" },
@@ -19,42 +66,67 @@ const STATUS_TABS = [
   { value: "paid", label: "已付款" },
   { value: "shipped", label: "已出貨" },
   { value: "completed", label: "已完成" },
-  { value: "rejected", label: "已拒絕" },
-  { value: "cancelled", label: "已取消" },
 ];
 
+const PAGE_SIZE_OPTIONS = [10, 20, 50];
+
 function formatDateTime(isoString) {
-  return new Date(isoString).toLocaleString("zh-TW", {
-    dateStyle: "medium",
-    timeStyle: "short",
-    timeZone: "Asia/Taipei",
-  });
+  const date = new Date(isoString);
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  const hh = String(date.getHours()).padStart(2, "0");
+  const mi = String(date.getMinutes()).padStart(2, "0");
+  return `${yyyy}/${mm}/${dd} ${hh}:${mi}`;
 }
 
 export default function OrderListPage() {
   const { token } = useAuth();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const groupBuyId = searchParams.get("group_buy_id") ?? undefined;
-  const initialStatus = searchParams.get("status") ?? undefined;
 
-  const [status, setStatus] = useState(initialStatus);
+  // 狀態篩選以網址為單一來源：從儀表板帶 ?status=pending 進來後若只改元件狀態，
+  // 網址仍留著舊參數，重新整理就會跳回原本的篩選。
+  const status = searchParams.get("status") ?? undefined;
+  const onlyPendingCancellation = searchParams.get("has_pending_cancellation") === "true";
+
+  const [activityId, setActivityId] = useState("");
   const [keyword, setKeyword] = useState("");
   const [keywordInput, setKeywordInput] = useState("");
+  // 畫面預設「從新到舊」（使用者 2026-07-29 裁決）。
+  // API 本身仍以先喊先得為預設（Business Rules §24.1），這裡明確帶參數覆寫。
+  const [newestFirst, setNewestFirst] = useState(true);
   const [page, setPage] = useState(1);
+  // 依圖 25 預設每頁 10 筆
+  const [pageSize, setPageSize] = useState(10);
   const [orders, setOrders] = useState(null);
   const [pagination, setPagination] = useState(null);
+  const [summary, setSummary] = useState(null);
   const [error, setError] = useState(false);
   const [confirmShipAll, setConfirmShipAll] = useState(false);
   const [shippingAll, setShippingAll] = useState(false);
   const [feedback, setFeedback] = useState(null);
 
+  // 活動篩選下拉的選項：從自己的開團推導，避免列出從未開團的活動
+  const [myGroupBuys, setMyGroupBuys] = useState([]);
+
   function load() {
     setError(false);
     setOrders(null);
-    getGroupLeaderOrders(token, { status, groupBuyId, keyword: keyword || undefined, page })
+    getGroupLeaderOrders(token, {
+      status,
+      groupBuyId,
+      activityId: activityId || undefined,
+      hasPendingCancellation: onlyPendingCancellation ? true : undefined,
+      keyword: keyword || undefined,
+      newestFirst: newestFirst ? true : undefined,
+      page,
+      pageSize,
+    })
       .then((response) => {
         setOrders(response.data);
         setPagination(response.pagination);
+        setSummary(response.summary);
       })
       .catch(() => setError(true));
   }
@@ -62,12 +134,58 @@ export default function OrderListPage() {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status, groupBuyId, keyword, page]);
+  }, [status, groupBuyId, activityId, onlyPendingCancellation, keyword, newestFirst, page, pageSize]);
+
+  useEffect(() => {
+    getMyGroupBuys(token, { pageSize: 50 })
+      .then((response) => setMyGroupBuys(response.data))
+      .catch(() => setMyGroupBuys([]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const activityOptions = useMemo(() => {
+    const seen = new Map();
+    myGroupBuys.forEach((groupBuy) => {
+      if (!seen.has(groupBuy.activity.id)) {
+        seen.set(groupBuy.activity.id, groupBuy.activity.name);
+      }
+    });
+    return [...seen.entries()].map(([id, name]) => ({ id, name }));
+  }, [myGroupBuys]);
 
   function handleSearchSubmit(event) {
     event.preventDefault();
     setPage(1);
     setKeyword(keywordInput.trim());
+  }
+
+  /**
+   * 更新狀態篩選並同步網址，讓重新整理後的畫面與目前選擇一致。
+   * 兩個參數互斥：選了狀態就清掉取消申請篩選，反之亦然。
+   */
+  function applyFilter({ nextStatus, pendingCancellation }) {
+    const params = new URLSearchParams(searchParams);
+    if (nextStatus) {
+      params.set("status", nextStatus);
+    } else {
+      params.delete("status");
+    }
+    if (pendingCancellation) {
+      params.set("has_pending_cancellation", "true");
+    } else {
+      params.delete("has_pending_cancellation");
+    }
+    setSearchParams(params, { replace: true });
+    setPage(1);
+  }
+
+  /** 統計卡：點待處理取消申請切換該篩選，其餘切換狀態（點第二次取消）。 */
+  function handleCardClick(card) {
+    if (card.cancellationFilter) {
+      applyFilter({ pendingCancellation: !onlyPendingCancellation });
+      return;
+    }
+    applyFilter({ nextStatus: status === card.status ? undefined : card.status });
   }
 
   async function handleShipAll() {
@@ -105,7 +223,7 @@ export default function OrderListPage() {
     <>
       <div className="page-header">
         <h1>訂單管理</h1>
-        <p className="helper-text">查看與管理團購訂單狀態。</p>
+        <p className="helper-text">管理所有開團活動的訂單，掌握處理進度與狀態</p>
         {groupBuyId && (
           <p className="helper-text">
             篩選中：僅顯示此開團的訂單 <Link to="/group-leader/orders">清除篩選</Link>
@@ -115,7 +233,112 @@ export default function OrderListPage() {
 
       {feedback && <Alert type={feedback.type}>{feedback.message}</Alert>}
 
-      {groupBuyId ? (
+      {/* 從儀表板「待處理訂單」卡進來時沒有對應頁籤，用提示條說明目前的篩選 */}
+      {status === "pending" && (
+        <div className="ann-filter-bar">
+          <span>目前顯示待處理訂單（待確認＋待付款）</span>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={() => applyFilter({})}
+          >
+            顯示全部訂單
+          </button>
+        </div>
+      )}
+
+      {summary && (
+        <div className="ol-summary">
+          {SUMMARY_CARDS.map((card) => {
+            // 選了複合值「待處理」時，待確認與待付款兩張卡都算選中
+            const active = card.cancellationFilter
+              ? onlyPendingCancellation
+              : status === card.status ||
+                (status === "pending" &&
+                  ["pending_confirmation", "pending_payment"].includes(card.status));
+            return (
+              <button
+                type="button"
+                key={card.key}
+                className={`stat-card stat-card--icon ol-summary-card${active ? " is-active" : ""}`}
+                onClick={() => handleCardClick(card)}
+                aria-pressed={active}
+              >
+                <span className={`dash-icon ${card.tone}`}>
+                  <card.Icon className="dash-icon-svg" />
+                </span>
+                <span className="stat-card-text">
+                  <span className="stat-card-label">{card.label}</span>
+                  <span className="stat-card-value">{summary[card.key]}</span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      <div className="ol-toolbar">
+        <div className="gbl-tabs">
+          {STATUS_TABS.map((tab) => (
+            <button
+              key={tab.label}
+              type="button"
+              className={`gbl-tab${
+                status === tab.value && !onlyPendingCancellation ? " is-active" : ""
+              }`}
+              onClick={() => applyFilter({ nextStatus: tab.value })}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        <select
+          aria-label="依活動篩選"
+          className="ol-activity-select"
+          value={activityId}
+          onChange={(event) => {
+            setActivityId(event.target.value);
+            setPage(1);
+          }}
+        >
+          <option value="">所有活動</option>
+          {activityOptions.map((activity) => (
+            <option key={activity.id} value={activity.id}>
+              {activity.name}
+            </option>
+          ))}
+        </select>
+
+        <form className="search-input ol-search" onSubmit={handleSearchSubmit} role="search">
+          <input
+            type="search"
+            placeholder="搜尋訂單編號或會員名稱"
+            value={keywordInput}
+            onChange={(event) => setKeywordInput(event.target.value)}
+            aria-label="搜尋訂單編號或會員名稱"
+          />
+          <button type="submit" className="search-input-icon-btn" aria-label="搜尋">
+            <SearchIcon className="icon-search" />
+          </button>
+        </form>
+
+        <select
+          aria-label="排序方式"
+          className="ol-sort-select"
+          value={newestFirst ? "newest" : "oldest"}
+          onChange={(event) => {
+            setNewestFirst(event.target.value === "newest");
+            setPage(1);
+          }}
+        >
+          {/* 預設為從舊到新，即 Business Rules §24.1 的先喊先得 */}
+          <option value="oldest">從舊到新</option>
+          <option value="newest">從新到舊</option>
+        </select>
+      </div>
+
+      {groupBuyId && (
         <div className="gl-bulk-actions">
           <Button variant="secondary" onClick={() => setConfirmShipAll(true)}>
             一鍵標記全團已出貨
@@ -124,57 +347,30 @@ export default function OrderListPage() {
             會將此開團所有「已付款」訂單一次標記為已出貨並通知團員；其他狀態的訂單不受影響。
           </span>
         </div>
-      ) : (
-        <p className="helper-text" style={{ marginBottom: "1rem" }}>
-          想一次為整團出貨？請從「我的開團」進入該開團的訂單，或在網址帶上 group_buy_id 篩選後即可使用批次出貨。
-        </p>
       )}
-
-      <div className="group-buy-card-row" style={{ flexWrap: "wrap", marginBottom: "1rem" }}>
-        {STATUS_TABS.map((tab) => (
-          <button
-            key={tab.label}
-            type="button"
-            className={`btn ${status === tab.value ? "btn-primary" : "btn-secondary"}`}
-            onClick={() => {
-              setStatus(tab.value);
-              setPage(1);
-            }}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      <form className="search-input" style={{ maxWidth: "360px", marginBottom: "1.5rem" }} onSubmit={handleSearchSubmit}>
-        <input
-          type="search"
-          placeholder="搜尋訂單編號或會員名稱"
-          value={keywordInput}
-          onChange={(event) => setKeywordInput(event.target.value)}
-        />
-        <button type="submit">搜尋</button>
-      </form>
 
       {error ? (
         <ErrorState onRetry={load} />
       ) : orders === null ? (
         <PageLoader />
       ) : orders.length === 0 ? (
-        <EmptyState title="沒有符合的訂單。" />
+        <EmptyState
+          title="沒有符合的訂單。"
+          description={keyword ? `找不到符合「${keyword}」的訂單。` : undefined}
+        />
       ) : (
         <>
-          <p className="helper-text">共 {pagination.total_items} 筆訂單</p>
           <div className="table-wrap">
-            <table className="table">
+            <table className="table ol-table">
               <thead>
                 <tr>
                   <th>訂單編號</th>
+                  <th>開團</th>
                   <th>會員</th>
-                  <th>活動</th>
+                  <th>商品摘要</th>
                   <th>商品總額</th>
-                  <th>訂單狀態</th>
-                  <th>下單時間</th>
+                  <th>狀態</th>
+                  <th>提交時間</th>
                   <th>操作</th>
                 </tr>
               </thead>
@@ -182,21 +378,72 @@ export default function OrderListPage() {
                 {orders.map((order) => (
                   <tr key={order.id}>
                     <td>{order.order_number}</td>
-                    <td>{order.member_nickname}</td>
-                    <td>{order.activity_name}</td>
+                    <td>
+                      <span className="ol-group-buy">
+                        <span className="ol-group-buy-name">
+                          {order.activity_name}｜第 {order.round_number} 團
+                        </span>
+                        <span
+                          className={`status-badge ${
+                            order.group_buy_status === "open"
+                              ? "status-badge-success"
+                              : "status-badge-neutral"
+                          }`}
+                        >
+                          {order.group_buy_status === "open" ? "進行中" : "已結單"}
+                        </span>
+                      </span>
+                    </td>
+                    <td>
+                      <span className="dash-applicant">
+                        {order.member_avatar_url ? (
+                          <img
+                            className="avatar-circle avatar-circle-sm"
+                            src={resolveMediaUrl(order.member_avatar_url)}
+                            alt=""
+                          />
+                        ) : (
+                          <span className="avatar-circle avatar-circle-sm" aria-hidden="true">
+                            {order.member_nickname?.[0]?.toUpperCase() ?? "?"}
+                          </span>
+                        )}
+                        {order.member_nickname}
+                      </span>
+                    </td>
+                    <td>
+                      <span className="ol-items">
+                        {order.representative_image_url && (
+                          <img
+                            className="ol-item-image"
+                            src={resolveMediaUrl(order.representative_image_url)}
+                            alt=""
+                          />
+                        )}
+                        <span className="ol-item-text">
+                          <span>{order.item_summary}</span>
+                          <span className="ol-item-count">
+                            共 {order.total_quantity} 件商品
+                          </span>
+                        </span>
+                      </span>
+                    </td>
                     <td>NT$ {order.product_total_amount}</td>
                     <td>
-                      <StatusBadge domain="order" value={order.status} />
-                      {order.has_pending_cancellation && (
-                        <span className="status-badge status-badge-danger" style={{ marginLeft: "0.35rem" }}>
-                          取消申請中
-                        </span>
-                      )}
+                      <span className="ol-status">
+                        <StatusBadge domain="order" value={order.status} />
+                        {order.has_pending_cancellation && (
+                          <span className="ol-cancel-note">
+                            <AlertTriangleIcon />
+                            有取消申請
+                          </span>
+                        )}
+                      </span>
                     </td>
                     <td>{formatDateTime(order.created_at)}</td>
                     <td>
-                      <Link className="btn btn-secondary" to={`/group-leader/orders/${order.id}`}>
-                        查看詳情
+                      <Link className="ol-view-btn" to={`/group-leader/orders/${order.id}`}>
+                        <ClipboardIcon />
+                        查看訂單
                       </Link>
                     </td>
                   </tr>
@@ -204,7 +451,32 @@ export default function OrderListPage() {
               </tbody>
             </table>
           </div>
-          <Pagination page={pagination.page} totalPages={pagination.total_pages} onPageChange={setPage} />
+
+          <div className="gbl-footer">
+            <Pagination
+              page={pagination.page}
+              totalPages={pagination.total_pages}
+              onPageChange={setPage}
+            />
+            <label className="gbl-page-size">
+              每頁顯示
+              <select
+                aria-label="每頁顯示筆數"
+                value={pageSize}
+                onChange={(event) => {
+                  setPageSize(Number(event.target.value));
+                  setPage(1);
+                }}
+              >
+                {PAGE_SIZE_OPTIONS.map((size) => (
+                  <option key={size} value={size}>
+                    {size}
+                  </option>
+                ))}
+              </select>
+              筆
+            </label>
+          </div>
         </>
       )}
 

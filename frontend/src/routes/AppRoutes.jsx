@@ -31,6 +31,7 @@ import GroupLeaderOwnProfilePage from "../pages/group-leader/ProfilePage.jsx";
 import GroupLeaderGroupBuyListPage from "../pages/group-leader/GroupBuyListPage.jsx";
 import GroupLeaderGroupBuyCreatePage from "../pages/group-leader/GroupBuyCreatePage.jsx";
 import GroupLeaderGroupBuyEditPage from "../pages/group-leader/GroupBuyEditPage.jsx";
+import GroupLeaderProductOrdersPage from "../pages/group-leader/ProductOrdersPage.jsx";
 import GroupLeaderOrderListPage from "../pages/group-leader/OrderListPage.jsx";
 import GroupLeaderOrderDetailPage from "../pages/group-leader/OrderDetailPage.jsx";
 import GroupLeaderAnnouncementListPage from "../pages/group-leader/AnnouncementListPage.jsx";
@@ -77,6 +78,10 @@ export default function AppRoutes() {
           <Route path="/group-leader/group-buys" element={<GroupLeaderGroupBuyListPage />} />
           <Route path="/group-leader/group-buys/new" element={<GroupLeaderGroupBuyCreatePage />} />
           <Route path="/group-leader/group-buys/:groupBuyId" element={<GroupLeaderGroupBuyEditPage />} />
+          <Route
+            path="/group-leader/group-buys/:groupBuyId/product-orders"
+            element={<GroupLeaderProductOrdersPage />}
+          />
           <Route path="/group-leader/orders" element={<GroupLeaderOrderListPage />} />
           <Route path="/group-leader/orders/:orderId" element={<GroupLeaderOrderDetailPage />} />
           <Route path="/group-leader/announcements" element={<GroupLeaderAnnouncementListPage />} />

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { getMyGroupBuys } from "../../api/groupLeaderGroupBuys.js";
 import {
   createAnnouncement,
@@ -34,6 +35,9 @@ const EMPTY_FORM = {
 
 export default function AnnouncementListPage() {
   const { token } = useAuth();
+  // 從圖 22 的「團購公告」分頁進來時只顯示該團的公告
+  const [searchParams, setSearchParams] = useSearchParams();
+  const filterGroupBuyId = searchParams.get("group_buy_id") ?? undefined;
   const [page, setPage] = useState(1);
   const [announcements, setAnnouncements] = useState(null);
   const [pagination, setPagination] = useState(null);
@@ -51,7 +55,7 @@ export default function AnnouncementListPage() {
   function load() {
     setError(false);
     setAnnouncements(null);
-    getMyAnnouncements(token, { page })
+    getMyAnnouncements(token, { groupBuyId: filterGroupBuyId, page })
       .then((response) => {
         setAnnouncements(response.data);
         setPagination(response.pagination);
@@ -62,7 +66,7 @@ export default function AnnouncementListPage() {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page]);
+  }, [page, filterGroupBuyId]);
 
   useEffect(() => {
     getMyGroupBuys(token, { pageSize: 50 }).then((response) => setGroupBuys(response.data));
@@ -141,6 +145,30 @@ export default function AnnouncementListPage() {
         </div>
         <Button onClick={openCreateForm}>+ 新增公告</Button>
       </div>
+
+      {/* 篩選中要讓團主看得出來現在不是全部公告，否則會以為公告不見了 */}
+      {filterGroupBuyId && (
+        <div className="ann-filter-bar">
+          <span>
+            目前只顯示
+            <strong>
+              {groupBuys.find((groupBuy) => groupBuy.id === filterGroupBuyId)?.activity.name ??
+                "指定開團"}
+            </strong>
+            的公告
+          </span>
+          <button
+            type="button"
+            className="btn btn-secondary"
+            onClick={() => {
+              setSearchParams({});
+              setPage(1);
+            }}
+          >
+            顯示全部公告
+          </button>
+        </div>
+      )}
 
       <div className="two-col-section">
         <div>

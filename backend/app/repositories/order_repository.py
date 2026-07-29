@@ -1,4 +1,5 @@
 import uuid
+from collections.abc import Sequence
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import func, or_, select, text
@@ -9,7 +10,9 @@ from app.models.group_buy import GroupBuy
 from app.models.order import CancellationRequest, GroupOrder, OrderItem, OrderStatusHistory
 from app.models.user import AppUser
 
-_NON_OCCUPYING_STATUSES = ("cancelled", "rejected")
+# 不佔用庫存、也不計入團主端統計的訂單狀態。開團統計（訂單數／訂購數量）沿用同一基準，
+# 依使用者 2026-07-29 裁決：已取消與已拒絕的訂單不算進統計。
+NON_OCCUPYING_STATUSES = ("cancelled", "rejected")
 
 
 def get_occupied_quantity(
@@ -24,7 +27,7 @@ def get_occupied_quantity(
         .join(GroupOrder, GroupOrder.id == OrderItem.order_id)
         .where(
             OrderItem.group_buy_product_id == group_buy_product_id,
-            GroupOrder.status.notin_(_NON_OCCUPYING_STATUSES),
+            GroupOrder.status.notin_(NON_OCCUPYING_STATUSES),
         )
     )
     if character_id is not None:
@@ -170,19 +173,20 @@ def count_by_group_buy_and_status(
     return int(db.execute(stmt).scalar_one())
 
 
-def count_for_leader_by_status(
-    db: Session, group_leader_profile_id: uuid.UUID, status: OrderStatus
+def count_for_leader_by_statuses(
+    db: Session, group_leader_profile_id: uuid.UUID, statuses: Sequence[OrderStatus]
 ) -> int:
+    """統計該團主底下指定狀態的訂單數。傳入多個狀態時為合計（例如「待處理」）。"""
     stmt = (
         select(func.count())
         .select_from(GroupOrder)
         .join(GroupBuy, GroupBuy.id == GroupOrder.group_buy_id)
         .where(
             GroupBuy.group_leader_profile_id == group_leader_profile_id,
-            GroupOrder.status == status,
+            GroupOrder.status.in_(tuple(statuses)),
         )
     )
-    return db.execute(stmt).scalar_one()
+    return int(db.execute(stmt).scalar_one())
 
 
 def get_group_buy_for_update(db: Session, group_buy_id: uuid.UUID) -> GroupBuy | None:
@@ -190,19 +194,14 @@ def get_group_buy_for_update(db: Session, group_buy_id: uuid.UUID) -> GroupBuy |
     return db.execute(stmt).scalar_one_or_none()
 
 
-def list_for_leader(
-    db: Session,
+def _leader_orders_stmt(
     group_leader_profile_id: uuid.UUID,
     *,
     group_buy_id: uuid.UUID | None,
     activity_id: uuid.UUID | None,
-    status: OrderStatus | None,
-    has_pending_cancellation: bool | None,
     keyword: str | None,
-    page: int,
-    page_size: int,
-) -> tuple[list[GroupOrder], int]:
-    """依 API Design §24.1：團主訂單列表，預設 created_at ASC, id ASC（先喊先得）。"""
+):
+    """團主訂單的共用篩選（不含狀態），列表與統計卡共用同一組條件。"""
     stmt = (
         select(GroupOrder)
         .join(GroupBuy, GroupBuy.id == GroupOrder.group_buy_id)
@@ -212,8 +211,6 @@ def list_for_leader(
         stmt = stmt.where(GroupOrder.group_buy_id == group_buy_id)
     if activity_id is not None:
         stmt = stmt.where(GroupBuy.activity_id == activity_id)
-    if status is not None:
-        stmt = stmt.where(GroupOrder.status == status)
     if keyword:
         stmt = stmt.join(AppUser, AppUser.id == GroupOrder.user_id).where(
             or_(
@@ -221,6 +218,83 @@ def list_for_leader(
                 AppUser.nickname.ilike(f"%{keyword}%"),
             )
         )
+    return stmt
+
+
+def count_for_leader_grouped_by_status(
+    db: Session,
+    group_leader_profile_id: uuid.UUID,
+    *,
+    group_buy_id: uuid.UUID | None = None,
+    activity_id: uuid.UUID | None = None,
+    keyword: str | None = None,
+) -> dict[OrderStatus, int]:
+    """圖 25 統計卡：各狀態的訂單數，一次 GROUP BY 取回。
+
+    刻意不吃 status 條件——統計卡是切換狀態篩選的入口，跟著篩選變動會自相矛盾。
+    """
+    base = _leader_orders_stmt(
+        group_leader_profile_id,
+        group_buy_id=group_buy_id,
+        activity_id=activity_id,
+        keyword=keyword,
+    ).subquery()
+    stmt = select(base.c.status, func.count()).group_by(base.c.status)
+    return {status: int(count) for status, count in db.execute(stmt).all()}
+
+
+def count_pending_cancellation_for_leader(
+    db: Session,
+    group_leader_profile_id: uuid.UUID,
+    *,
+    group_buy_id: uuid.UUID | None = None,
+    activity_id: uuid.UUID | None = None,
+    keyword: str | None = None,
+) -> int:
+    """圖 25「待處理取消申請」卡：有待處理取消申請的訂單數。"""
+    base = _leader_orders_stmt(
+        group_leader_profile_id,
+        group_buy_id=group_buy_id,
+        activity_id=activity_id,
+        keyword=keyword,
+    ).subquery()
+    pending_order_ids = select(CancellationRequest.order_id).where(
+        CancellationRequest.status == CancellationStatus.PENDING
+    )
+    stmt = (
+        select(func.count())
+        .select_from(base)
+        .where(base.c.id.in_(pending_order_ids))
+    )
+    return int(db.execute(stmt).scalar_one())
+
+
+def list_for_leader(
+    db: Session,
+    group_leader_profile_id: uuid.UUID,
+    *,
+    group_buy_id: uuid.UUID | None,
+    activity_id: uuid.UUID | None,
+    statuses: Sequence[OrderStatus] | None,
+    has_pending_cancellation: bool | None,
+    keyword: str | None,
+    page: int,
+    page_size: int,
+    newest_first: bool = False,
+) -> tuple[list[GroupOrder], int]:
+    """依 API Design §24.1：團主訂單列表，預設 created_at ASC, id ASC（先喊先得）。
+
+    statuses 接受多個狀態以支援「待處理」這種複合篩選（待確認＋待付款）。
+    newest_first 只改變排序方向，預設仍是先喊先得（Business Rules §24.1）。
+    """
+    stmt = _leader_orders_stmt(
+        group_leader_profile_id,
+        group_buy_id=group_buy_id,
+        activity_id=activity_id,
+        keyword=keyword,
+    )
+    if statuses:
+        stmt = stmt.where(GroupOrder.status.in_(tuple(statuses)))
     if has_pending_cancellation is not None:
         pending_order_ids = select(CancellationRequest.order_id).where(
             CancellationRequest.status == CancellationStatus.PENDING
@@ -230,12 +304,15 @@ def list_for_leader(
         else:
             stmt = stmt.where(GroupOrder.id.notin_(pending_order_ids))
 
+    order_by = (
+        (GroupOrder.created_at.desc(), GroupOrder.id.desc())
+        if newest_first
+        else (GroupOrder.created_at.asc(), GroupOrder.id.asc())
+    )
     total = db.execute(select(func.count()).select_from(stmt.subquery())).scalar_one()
     items = (
         db.execute(
-            stmt.order_by(GroupOrder.created_at.asc(), GroupOrder.id.asc())
-            .offset((page - 1) * page_size)
-            .limit(page_size)
+            stmt.order_by(*order_by).offset((page - 1) * page_size).limit(page_size)
         )
         .scalars()
         .all()

@@ -1,22 +1,29 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
-from app.models.enums import ActivityStatus, GroupBuyStatus, PaymentMethod
+from app.models.enums import ActivityStatus, GroupBuyListSort, GroupBuyStatus, PaymentMethod
 from app.models.group_buy import GroupBuy
 from app.models.group_leader import GroupLeaderProfile
+from app.models.enums import ContactPlatform
 from app.repositories import activity_repository, group_buy_repository, order_repository, product_repository
+from app.schemas.common import FACEBOOK_URL_ERROR, is_facebook_url
 from app.schemas.group_leader_group_buy import (
     AddGroupBuyProductRequest,
     CreateGroupBuyRequest,
+    GroupBuyOwnerActivityCard,
     GroupBuyOwnerActivityRef,
     GroupBuyOwnerCharacterStock,
     GroupBuyOwnerDetailResponse,
     GroupBuyOwnerListItem,
+    GroupBuyOwnerListSummary,
     GroupBuyOwnerProductItem,
     GroupBuyOwnerProductRef,
+    GroupBuyProductOrdersResponse,
+    ProductOrderGroup,
+    ProductOrderMemberItem,
     UpdateGroupBuyProductRequest,
     UpdateGroupBuySettingsRequest,
 )
@@ -75,6 +82,61 @@ def _ensure_utc(value: datetime) -> datetime:
     return value if value.tzinfo is not None else value.replace(tzinfo=timezone.utc)
 
 
+_CONTACT_PLATFORM_LABELS = {
+    ContactPlatform.FACEBOOK: "Facebook",
+    ContactPlatform.DISCORD: "Discord",
+    ContactPlatform.LINE: "LINE",
+}
+
+
+def _leader_contact_value(profile: GroupLeaderProfile, platform: ContactPlatform) -> str | None:
+    """團主資料中該平台的公開聯絡方式，未設定回傳 None。"""
+    return {
+        ContactPlatform.FACEBOOK: profile.facebook_url,
+        ContactPlatform.DISCORD: profile.discord_contact,
+        ContactPlatform.LINE: profile.line_contact,
+    }[platform]
+
+
+def _validate_contact(
+    profile: GroupLeaderProfile, platform: ContactPlatform, value: str
+) -> None:
+    """開團的主要聯絡方式必須取自團主資料已設定的公開聯絡方式。
+
+    依使用者 2026-07-29 裁決：開團不另外輸入聯絡方式，一律沿用團主資料，
+    避免同一位團主在不同開團留下不一致（甚至過期）的聯絡資訊。
+    在 Service 層檢查而非 schema，因為 PATCH 可能只送其中一欄、另一欄沿用既有值，
+    schema 當下看不到最終組合。
+    """
+    profile_value = _leader_contact_value(profile, platform)
+    label = _CONTACT_PLATFORM_LABELS[platform]
+
+    if not profile_value:
+        raise AppError(
+            422,
+            "CONTACT_NOT_SET_IN_PROFILE",
+            f"請先在團主資料填寫 {label}，才能將它設為開團的主要聯絡方式。",
+            {"fields": {"contact_platform": [f"團主資料尚未設定 {label}。"]}},
+        )
+
+    if value != profile_value:
+        raise AppError(
+            422,
+            "CONTACT_VALUE_MISMATCH",
+            f"主要聯絡方式需與團主資料的 {label} 一致，請改到團主資料修改。",
+            {"fields": {"contact_value": [f"應為團主資料設定的 {label}。"]}},
+        )
+
+    # 團主資料的 FB 已驗證為連結，這裡再擋一次以防既有資料是舊格式
+    if platform == ContactPlatform.FACEBOOK and not is_facebook_url(value):
+        raise AppError(
+            422,
+            "VALIDATION_ERROR",
+            "輸入資料格式不正確。",
+            {"fields": {"contact_value": [FACEBOOK_URL_ERROR]}},
+        )
+
+
 def _load_owned_group_buy(db: Session, profile: GroupLeaderProfile, group_buy_id: uuid.UUID) -> GroupBuy:
     group_buy = group_buy_repository.get_by_id(db, group_buy_id)
     if group_buy is None:
@@ -113,6 +175,8 @@ def create_group_buy(
 
     if payload.includes_full_gift and not activity.has_full_gift:
         raise AppError(409, "FULL_GIFT_NOT_SUPPORTED", "此活動不支援滿贈。")
+
+    _validate_contact(profile, payload.contact_platform, payload.contact_value)
 
     resolved_products = []
     for item in payload.products:
@@ -154,27 +218,144 @@ def create_group_buy(
     return get_my_group_buy_detail(db, profile, group_buy.id)
 
 
-def get_my_group_buys(
-    db: Session, profile: GroupLeaderProfile, status: GroupBuyStatus | None, page: int, page_size: int
-) -> tuple[list[GroupBuyOwnerListItem], int]:
-    group_buys, total = group_buy_repository.list_by_group_leader_paginated(
-        db, profile.id, status, page, page_size
+def _is_upcoming_deadline(group_buy: GroupBuy) -> bool:
+    """是否落在圖 20／21 的「即將截止」標記範圍（進行中且 3 天內到期）。"""
+    if group_buy.status != GroupBuyStatus.OPEN:
+        return False
+    deadline = _ensure_utc(group_buy.deadline_at)
+    now = datetime.now(timezone.utc)
+    return now < deadline <= now + timedelta(days=group_buy_repository.UPCOMING_DEADLINE_DAYS)
+
+
+def _to_list_item(row: tuple) -> GroupBuyOwnerListItem:
+    """把 repository 的聚合查詢結果組成列表項目。"""
+    (
+        group_buy,
+        activity,
+        round_number,
+        order_count,
+        ordered_quantity,
+        pending_order_count,
+        total_order_count,
+    ) = row
+    return GroupBuyOwnerListItem(
+        id=group_buy.id,
+        activity=GroupBuyOwnerActivityCard.model_validate(activity, from_attributes=True),
+        round_number=round_number,
+        status=group_buy.status,
+        payment_method=group_buy.payment_method,
+        deadline_at=group_buy.deadline_at,
+        is_upcoming_deadline=_is_upcoming_deadline(group_buy),
+        order_count=order_count,
+        ordered_quantity=ordered_quantity,
+        pending_order_count=pending_order_count,
+        has_orders=total_order_count > 0,
+        created_at=group_buy.created_at,
     )
-    items = []
-    for group_buy in group_buys:
-        activity = activity_repository.get_by_id(db, group_buy.activity_id)
-        has_orders = group_buy_repository.count_formal_orders(db, group_buy.id) > 0
-        items.append(
-            GroupBuyOwnerListItem(
-                id=group_buy.id,
-                activity=GroupBuyOwnerActivityRef.model_validate(activity, from_attributes=True),
-                status=group_buy.status,
-                deadline_at=group_buy.deadline_at,
-                has_orders=has_orders,
-                created_at=group_buy.created_at,
+
+
+def get_my_group_buys(
+    db: Session,
+    profile: GroupLeaderProfile,
+    status: GroupBuyStatus | None,
+    page: int,
+    page_size: int,
+    *,
+    keyword: str | None = None,
+    sort: GroupBuyListSort = GroupBuyListSort.CREATED_DESC,
+) -> tuple[list[GroupBuyOwnerListItem], int, GroupBuyOwnerListSummary]:
+    """圖 21 我的開團。統計與輪次由單一查詢帶回，不再逐列打 DB。
+
+    summary 三張卡固定統計該團主的全部開團，不受 status／keyword 篩選影響——
+    卡片本身就是切換篩選的入口，跟著篩選變動會讓數字看起來自相矛盾。
+    """
+    rows, total = group_buy_repository.list_by_group_leader_with_stats(
+        db, profile.id, status, page, page_size, keyword=keyword, sort=sort
+    )
+    summary_counts = group_buy_repository.count_status_summary(db, profile.id)
+    summary = GroupBuyOwnerListSummary(
+        total=summary_counts["total"],
+        open=summary_counts["open"],
+        closed=summary_counts["closed"],
+    )
+    return [_to_list_item(row) for row in rows], total, summary
+
+
+def get_my_open_group_buys(
+    db: Session, profile: GroupLeaderProfile
+) -> list[GroupBuyOwnerListItem]:
+    """圖 20 儀表板「目前開團」：只列進行中、不分頁，依截止時間由近到遠。"""
+    rows = group_buy_repository.list_open_group_buys_with_stats(db, profile.id)
+    return [_to_list_item(row) for row in rows]
+
+
+def get_product_orders(
+    db: Session, profile: GroupLeaderProfile, group_buy_id: uuid.UUID
+) -> GroupBuyProductOrdersResponse:
+    """圖 22 商品訂購總覽：以「某一開團、某一商品」為主的訂購明細。
+
+    與訂單管理（以所有訂單為主）的差別見 docs/03 §26.1a。
+    """
+    group_buy = _load_owned_group_buy(db, profile, group_buy_id)
+    activity = activity_repository.get_by_id(db, group_buy.activity_id)
+
+    # 先建立所有開團商品的空群組，未被訂購的商品才不會從畫面上消失。
+    groups: dict[uuid.UUID, ProductOrderGroup] = {}
+    for group_buy_product, product in group_buy_repository.get_products_for_group_buy(
+        db, group_buy.id
+    ):
+        groups[group_buy_product.id] = ProductOrderGroup(
+            group_buy_product_id=group_buy_product.id,
+            product=GroupBuyOwnerProductRef.model_validate(product, from_attributes=True),
+            unit_price=group_buy_product.unit_price,
+            max_quantity=group_buy_product.max_quantity,
+            total_quantity=0,
+            member_count=0,
+            items=[],
+        )
+
+    members_by_product: dict[uuid.UUID, set[uuid.UUID]] = {key: set() for key in groups}
+    order_ids: set[uuid.UUID] = set()
+    total_ordered_quantity = 0
+
+    for group_buy_product, _product, order_item, order, user in (
+        group_buy_repository.list_product_orders(db, group_buy.id)
+    ):
+        group = groups.get(group_buy_product.id)
+        if group is None:
+            continue
+        group.items.append(
+            ProductOrderMemberItem(
+                order_id=order.id,
+                order_number=order.order_number,
+                user_id=user.id,
+                nickname=user.nickname,
+                avatar_url=user.avatar_url,
+                chosen_character_name=order_item.chosen_character_name_snapshot,
+                quantity=order_item.quantity,
+                order_status=order.status,
+                submitted_at=order.created_at,
             )
         )
-    return items, total
+        group.total_quantity += order_item.quantity
+        members_by_product[group_buy_product.id].add(user.id)
+        order_ids.add(order.id)
+        total_ordered_quantity += order_item.quantity
+
+    for product_id, members in members_by_product.items():
+        groups[product_id].member_count = len(members)
+
+    return GroupBuyProductOrdersResponse(
+        group_buy_id=group_buy.id,
+        activity=GroupBuyOwnerActivityCard.model_validate(activity, from_attributes=True),
+        round_number=group_buy_repository.get_round_number(db, group_buy),
+        status=group_buy.status,
+        deadline_at=group_buy.deadline_at,
+        # 訂單數以不重複訂單計算：一張訂單含多個商品時只算一筆。
+        total_order_count=len(order_ids),
+        total_ordered_quantity=total_ordered_quantity,
+        products=list(groups.values()),
+    )
 
 
 def get_my_group_buy_detail(
@@ -225,6 +406,7 @@ def get_my_group_buy_detail(
     return GroupBuyOwnerDetailResponse(
         id=group_buy.id,
         activity=GroupBuyOwnerActivityRef.model_validate(activity, from_attributes=True),
+        round_number=group_buy_repository.get_round_number(db, group_buy),
         payment_method=group_buy.payment_method,
         payment_method_note=group_buy.payment_method_note,
         requires_second_payment=group_buy.requires_second_payment,
@@ -275,10 +457,20 @@ def update_group_buy_settings(
             )
         group_buy.deadline_at = deadline
 
-    if "contact_platform" in provided:
-        group_buy.contact_platform = payload.contact_platform
-    if "contact_value" in provided:
-        group_buy.contact_value = payload.contact_value
+    if "contact_platform" in provided or "contact_value" in provided:
+        new_platform = (
+            payload.contact_platform if "contact_platform" in provided else group_buy.contact_platform
+        )
+        if "contact_value" in provided:
+            new_value = payload.contact_value
+        elif "contact_platform" in provided:
+            # 只切換平台時自動採用團主資料該平台的值，呼叫端不必重送
+            new_value = _leader_contact_value(profile, new_platform) or group_buy.contact_value
+        else:
+            new_value = group_buy.contact_value
+        _validate_contact(profile, new_platform, new_value)
+        group_buy.contact_platform = new_platform
+        group_buy.contact_value = new_value
 
     if not has_orders:
         if "payment_method" in provided or "payment_method_note" in provided:

@@ -2453,42 +2453,74 @@ GET /api/v1/group-leader/dashboard
 
 權限：`Completed Group Leader Profile`
 
-只回傳簡化統計與可點擊篩選條件：
+回傳統計卡與「目前開團」（依圖 20 補上後兩者）：
 
 ```json
 {
   "data": {
     "cards": [
       {
-        "key": "open_group_buys",
-        "label": "進行中開團",
-        "count": 2,
-        "target_url": "/group-leader/group-buys?status=open"
-      },
-      {
-        "key": "pending_confirmation_orders",
-        "label": "待確認訂單",
-        "count": 4,
-        "target_url": "/group-leader/orders?status=pending_confirmation"
-      },
-      {
-        "key": "pending_payment_orders",
-        "label": "待付款訂單",
-        "count": 3,
-        "target_url": "/group-leader/orders?status=pending_payment"
+        "key": "pending_orders",
+        "label": "待處理訂單",
+        "count": 18,
+        "target_url": "/group-leader/orders?status=pending"
       },
       {
         "key": "pending_cancellation_requests",
         "label": "待處理取消申請",
-        "count": 1,
+        "count": 5,
         "target_url": "/group-leader/orders?has_pending_cancellation=true"
+      },
+      {
+        "key": "open_group_buys",
+        "label": "進行中開團",
+        "count": 7,
+        "target_url": "/group-leader/group-buys?status=open"
+      },
+      {
+        "key": "upcoming_deadline_group_buys",
+        "label": "即將截止（3 天內）",
+        "count": 3,
+        "target_url": "/group-leader/group-buys?status=open"
+      }
+    ],
+    "current_group_buys": [
+      {
+        "activity_id": "uuid",
+        "activity_name": "3.4 官方周邊",
+        "activity_image_url": "https://.../activity.webp",
+        "activity_status": "open",
+        "group_buys": [
+          {
+            "id": "uuid",
+            "round_number": 1,
+            "status": "open",
+            "payment_method": "bank_transfer",
+            "deadline_at": "2026-08-10T15:00:00Z",
+            "is_upcoming_deadline": false,
+            "order_count": 42,
+            "ordered_quantity": 128,
+            "pending_order_count": 9
+          }
+        ]
       }
     ]
   }
 }
 ```
 
-第一版 Dashboard 不回傳最近公告或複雜圖表。
+`pending_orders`＝**待確認＋待付款**的合計。依使用者 2026-07-29 說明，這兩種狀態都是
+團主要處理的，因此不拆成兩張卡；`target_url` 用訂單列表的複合篩選 `?status=pending`
+（見 §24.1），點卡片看到的清單筆數與卡片數字一致。
+
+`upcoming_deadline_group_buys`：進行中且截止時間落在未來 3 天內。已過期但未結單的
+不算——那不是「即將」截止，而是團主已逾期未處理。
+
+`current_group_buys` 只含 `open` 的開團、不分頁，依活動分組，最早截止的活動排前面；
+完整紀錄請用 23.1。開團項目的欄位定義同 23.1。
+
+第一版 Dashboard 不回傳最近公告或複雜圖表。圖 20 四張卡上的「較昨日 +6 ↗」不做：
+資料庫沒有每日統計快照，昨天的數字已無從得知。
 
 ---
 
@@ -2500,7 +2532,69 @@ GET /api/v1/group-leader/dashboard
 GET /api/v1/group-leader/group-buys
 ```
 
-Query：`status`、`page`、`page_size`。
+Query：`status`、`keyword`、`page`、`page_size`。
+
+`keyword` 比對活動名稱（不分大小寫部分比對）。圖 21 的搜尋框寫「搜尋開團名稱」，
+但開團沒有名稱欄位（見下方 `round_number`），實際可搜的只有活動名稱。
+
+```json
+{
+  "data": [
+    {
+      "id": "uuid",
+      "activity": {
+        "id": "uuid",
+        "name": "3.4 官方周邊",
+        "image_url": "https://.../activity.webp",
+        "status": "open"
+      },
+      "round_number": 1,
+      "status": "open",
+      "payment_method": "bank_transfer",
+      "deadline_at": "2026-08-10T15:00:00Z",
+      "is_upcoming_deadline": false,
+      "order_count": 42,
+      "ordered_quantity": 128,
+      "pending_order_count": 9,
+      "has_orders": true,
+      "created_at": "2026-07-20T10:00:00Z"
+    }
+  ],
+  "pagination": { "...": "同其他分頁 API" },
+  "summary": { "total": 12, "open": 5, "closed": 7 }
+}
+```
+
+欄位定義：
+
+- `round_number`：第 N 團。資料庫沒有開團名稱欄位（使用者裁決不新增），輪次一律由後端
+  在「同一團主、同一活動」範圍內依 `created_at` 算出。排名在套用 `status`／`keyword`
+  篩選前計算，否則篩掉已結單的團會讓編號跳號。
+- `order_count`／`ordered_quantity`：**排除 `cancelled` 與 `rejected`**，與庫存佔用量
+  （§20.1）同一基準（使用者 2026-07-29 裁決）。
+- `pending_order_count`：**待確認＋待付款**的合計（＝「待處理」），與儀表板統計卡
+  `pending_orders` 同一定義。參考圖該欄標「待確認」，但依使用者 2026-07-29 裁決改為
+  待處理，全頁只有一種「要處理」的數字，避免兩種相近語意並存造成誤讀。
+- `has_orders`：Business Rules §16.1 的欄位凍結判斷，計入**所有**訂單紀錄，
+  與上兩者基準刻意不同，不可互相推導。
+- `is_upcoming_deadline`：進行中且 3 天內截止，供列表顯示「即將截止」標記。
+- `summary`：圖 21 上方三張卡。固定統計該團主的全部開團，**不隨 `status`／`keyword`
+  變動**——卡片本身就是切換篩選的入口，跟著篩選變動會讓數字自相矛盾。
+  參考圖另有「活動期間」欄，但 activity 沒有起訖日期欄位，依使用者裁決不做。
+
+---
+
+# 23.1a Get My Open Group Buys
+
+```http
+GET /api/v1/group-leader/group-buys/open
+```
+
+權限：`Completed Group Leader Profile`
+
+圖 20 儀表板「目前開團」用。只回傳 `open` 的開團、不分頁，依截止時間由近到遠，
+項目欄位同 23.1（無 `pagination`／`summary`）。儀表板 API（22.4）已內含依活動分組的
+同一份資料，此端點供只需要清單、不需要統計卡的情境單獨取用。
 
 ---
 
@@ -2549,6 +2643,12 @@ Validation：
 - `payment_method` 僅接受 `bank_transfer` 或 `cash_on_delivery`
 - `payment_method_note` 為選填，任何付款方式皆可填寫；空白字串一律正規化為 `null`
 - 同一團主對同一活動已有進行中的開團時，回 409 `GROUP_BUY_ALREADY_OPEN_FOR_ACTIVITY`
+- **主要聯絡方式必須取自團主資料已設定的公開聯絡方式**（使用者 2026-07-29 裁決）：
+  - 團主資料未設定該平台 → 422 `CONTACT_NOT_SET_IN_PROFILE`
+  - `contact_value` 與團主資料該平台的值不符 → 422 `CONTACT_VALUE_MISMATCH`
+
+  理由：開團不另外輸入聯絡方式，避免同一位團主在不同開團留下不一致或過期的聯絡資訊。
+  Facebook 必須是個人頁連結（與會員聯絡欄位共用同一套規則，見 §7.2）。
 
 任一步失敗不得建立部分開團商品。
 
@@ -2576,6 +2676,76 @@ GET /api/v1/group-leader/group-buys/{group_buy_id}
 
 ---
 
+# 23.3a Get Group Buy Product Orders
+
+```http
+GET /api/v1/group-leader/group-buys/{group_buy_id}/product-orders
+```
+
+權限：`Completed Group Leader Profile`，且開團屬於自己（否則 404 `GROUP_BUY_NOT_OWNED`）
+
+圖 22 商品訂購總覽。以「某一開團、某一商品」為主的訂購明細，與訂單管理（以所有訂單
+為主，§24.1）的觀看角度不同，見 UI 規格 §26.1a。
+
+```json
+{
+  "data": {
+    "group_buy_id": "uuid",
+    "activity": {
+      "id": "uuid",
+      "name": "3.4 官方周邊",
+      "image_url": "https://.../activity.webp",
+      "status": "open"
+    },
+    "round_number": 1,
+    "status": "open",
+    "deadline_at": "2026-08-10T15:00:00Z",
+    "total_order_count": 42,
+    "total_ordered_quantity": 128,
+    "products": [
+      {
+        "group_buy_product_id": "uuid",
+        "product": {
+          "id": "uuid",
+          "name": "今汐壓克力立牌",
+          "primary_image_url": "https://.../product.webp"
+        },
+        "unit_price": "390.00",
+        "max_quantity": 60,
+        "total_quantity": 56,
+        "member_count": 18,
+        "items": [
+          {
+            "order_id": "uuid",
+            "order_number": "WG260601-000012",
+            "user_id": "uuid",
+            "nickname": "星海小透明",
+            "avatar_url": "https://.../avatar.webp",
+            "chosen_character_name": "今汐",
+            "quantity": 2,
+            "order_status": "pending_confirmation",
+            "submitted_at": "2026-06-01T14:32:00Z"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+規則：
+
+- 全部統計排除 `cancelled` 與 `rejected`，與 23.1 同一基準。
+- `total_order_count` 以**不重複訂單**計算：一張訂單同時訂了多項商品時只算一筆。
+- `member_count` 以**不重複會員**計算：同一人訂多筆只算一人。
+- 未被訂購的開團商品仍會出現（`total_quantity` 為 0、`items` 為空陣列），
+  讓團主看得出「這個商品還沒有人訂」，而不是誤以為資料漏了。
+- `items` 依訂單建立時間遞增（先喊先得）；同一會員在同一商品可有多列
+  （不同訂單，或同一訂單的不同角色），不做合併。
+- `chosen_character_name` 取訂單成立時的角色名稱快照，無角色商品為 `null`。
+
+---
+
 # 23.4 Update Group Buy Settings
 
 ```http
@@ -2600,6 +2770,12 @@ PATCH /api/v1/group-leader/group-buys/{group_buy_id}
 - contact_value
 
 違反凍結規則回傳 `GROUP_BUY_FIELDS_FROZEN`。
+
+`deadline_at` 可**提早也可延後**，只是不得改到過去（Business Rules §16.5）；要立即停止
+收單請用 §23.8 提前結單。
+
+`contact_platform`／`contact_value` 沿用 §23.2 的規則（必須取自團主資料）。只送
+`contact_platform` 時後端自動採用團主資料該平台的值，呼叫端不必重送 `contact_value`。
 
 ---
 
@@ -2663,11 +2839,18 @@ Query：
 |---|---|
 | group_buy_id | 篩選開團 |
 | activity_id | 篩選活動 |
-| status | 訂單狀態 |
+| status | 訂單狀態，或複合值 `pending` |
 | has_pending_cancellation | 是否有待處理取消申請 |
 | keyword | 訂單編號或會員暱稱 |
 | page | 頁碼 |
 | page_size | 每頁數量 |
+
+`status` 除了 OrderStatus 的各實際狀態（`pending_confirmation`、`pending_payment`、
+`paid`、`shipped`、`completed`、`cancelled`、`rejected`），另接受複合值：
+
+- **`pending`＝待處理**，同時涵蓋 `pending_confirmation` 與 `pending_payment`。
+  依使用者 2026-07-29 說明，這兩種都是團主要處理的。儀表板「待處理訂單」卡即連到此篩選，
+  卡片數字與清單筆數因此一致。
 
 預設排序：
 
@@ -2676,6 +2859,10 @@ created_at ASC, id ASC
 ```
 
 團主最早收到的訂單排在前面，以符合先喊先得。第二次加喊的獨立訂單必定排在原訂單後面。
+
+`newest_first=true` 可改為最新提交在前。**API 的預設仍是先喊先得**（判斷收單順序時需要），
+但圖 25 訂單管理**畫面**依使用者 2026-07-29 裁決預設顯示「從新到舊」，由前端明確帶此參數；
+團主仍可用排序下拉切回「從舊到新」。
 
 ---
 

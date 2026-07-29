@@ -3,7 +3,13 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from app.models.enums import ActivityStatus, ContactPlatform, GroupBuyStatus, PaymentMethod
+from app.models.enums import (
+    ActivityStatus,
+    ContactPlatform,
+    GroupBuyStatus,
+    OrderStatus,
+    PaymentMethod,
+)
 from app.schemas.common import Money, UTCDateTime, normalize_optional_text
 
 
@@ -106,6 +112,19 @@ class GroupBuyOwnerActivityRef(BaseModel):
     status: ActivityStatus
 
 
+class GroupBuyOwnerActivityCard(BaseModel):
+    """圖 20／21 列表用的活動資訊，比 GroupBuyOwnerActivityRef 多帶圖片。
+
+    參考圖另有「活動期間」，但 activity 沒有起訖日期欄位，依使用者 2026-07-29
+    裁決不做這一行（同圖 07 出貨單號、圖 20 較昨日增減的處理方式）。
+    """
+
+    id: uuid.UUID
+    name: str
+    image_url: str
+    status: ActivityStatus
+
+
 class GroupBuyOwnerProductRef(BaseModel):
     id: uuid.UUID
     name: str
@@ -132,17 +151,87 @@ class GroupBuyOwnerProductItem(BaseModel):
 
 
 class GroupBuyOwnerListItem(BaseModel):
+    """圖 20／21 的開團列表項目。
+
+    round_number 是「第 N 團」，由後端在同團主同活動範圍內依建立時間算出
+    （資料庫沒有開團名稱欄位，使用者裁決不新增）。
+    order_count／ordered_quantity 排除已取消與已拒絕；has_orders 則是
+    Business Rules §16.1 的欄位凍結判斷，含所有紀錄，兩者基準刻意不同。
+    pending_order_count 為「待處理」＝待確認＋待付款，與儀表板統計卡同一定義。
+    """
+
     id: uuid.UUID
-    activity: GroupBuyOwnerActivityRef
+    activity: GroupBuyOwnerActivityCard
+    round_number: int
     status: GroupBuyStatus
+    payment_method: PaymentMethod
     deadline_at: UTCDateTime
+    is_upcoming_deadline: bool
+    order_count: int
+    ordered_quantity: int
+    pending_order_count: int
     has_orders: bool
     created_at: UTCDateTime
+
+
+class GroupBuyOwnerListSummary(BaseModel):
+    """圖 21 上方三張統計卡。與分頁結果同一次回應送出。"""
+
+    total: int
+    open: int
+    closed: int
+
+
+class ProductOrderMemberItem(BaseModel):
+    """圖 22 商品明細表的一列（成員／數量／訂單狀態／提交時間）。
+
+    同一會員在同一商品可有多筆（不同訂單、或同訂單不同角色），因此不做合併。
+    """
+
+    order_id: uuid.UUID
+    order_number: str
+    user_id: uuid.UUID
+    nickname: str
+    avatar_url: str | None
+    chosen_character_name: str | None
+    quantity: int
+    order_status: OrderStatus
+    submitted_at: UTCDateTime
+
+
+class ProductOrderGroup(BaseModel):
+    group_buy_product_id: uuid.UUID
+    product: GroupBuyOwnerProductRef
+    unit_price: Money
+    max_quantity: int
+    total_quantity: int
+    # 訂購成員數以不重複會員計算；同一人訂多筆只算一人。
+    member_count: int
+    items: list[ProductOrderMemberItem]
+
+
+class GroupBuyProductOrdersResponse(BaseModel):
+    """圖 22 商品訂購總覽：一次回傳頁首統計與每個商品的訂購明細。
+
+    未被訂購的商品也會出現（total_quantity 為 0、items 為空），
+    讓團主看得出「這個商品還沒有人訂」而不是以為漏資料。
+    """
+
+    group_buy_id: uuid.UUID
+    activity: GroupBuyOwnerActivityCard
+    round_number: int
+    status: GroupBuyStatus
+    deadline_at: UTCDateTime
+    total_order_count: int
+    total_ordered_quantity: int
+    products: list[ProductOrderGroup]
 
 
 class GroupBuyOwnerDetailResponse(BaseModel):
     id: uuid.UUID
     activity: GroupBuyOwnerActivityRef
+    # 第 N 團。圖 23 的「開團名稱」以「活動名稱 - 第 N 團」組成，麵包屑也需要。
+    round_number: int
     payment_method: PaymentMethod
     payment_method_note: str | None
     requires_second_payment: bool

@@ -40,6 +40,49 @@ def _create_order(client, db_session, group_buy_product_id, quantity=1):
     return create_response.json()["data"]["id"]
 
 
+def test_orders_status_pending_covers_confirmation_and_payment(client, db_session):
+    """status=pending 是複合篩選：待確認＋待付款，兩者都要團主處理。
+
+    圖 20 統計卡「待處理訂單」就是這兩者合計，點卡片必須看到完整清單。
+    """
+    leader_user, _leader_profile, _group_buy, group_buy_product = _setup_leader_and_group_buy(
+        db_session, max_quantity=20
+    )
+    pending_confirmation_id = _create_order(client, db_session, group_buy_product.id)
+    to_accept_id = _create_order(client, db_session, group_buy_product.id)
+    leader_headers = _leader_headers(client, leader_user)
+
+    # 接單後轉為待付款
+    accept = client.post(
+        f"/api/v1/group-leader/orders/{to_accept_id}/accept", headers=leader_headers
+    )
+    assert accept.status_code == 200, accept.text
+
+    pending = client.get(
+        "/api/v1/group-leader/orders", params={"status": "pending"}, headers=leader_headers
+    )
+    assert pending.status_code == 200, pending.text
+    assert {item["id"] for item in pending.json()["data"]} == {
+        pending_confirmation_id,
+        to_accept_id,
+    }
+
+    # 單一狀態篩選仍各自只回自己那筆
+    only_confirmation = client.get(
+        "/api/v1/group-leader/orders",
+        params={"status": "pending_confirmation"},
+        headers=leader_headers,
+    )
+    assert [item["id"] for item in only_confirmation.json()["data"]] == [pending_confirmation_id]
+
+    only_payment = client.get(
+        "/api/v1/group-leader/orders",
+        params={"status": "pending_payment"},
+        headers=leader_headers,
+    )
+    assert [item["id"] for item in only_payment.json()["data"]] == [to_accept_id]
+
+
 def test_get_orders_and_detail_for_leader(client, db_session):
     leader_user, _leader_profile, _group_buy, group_buy_product = _setup_leader_and_group_buy(
         db_session

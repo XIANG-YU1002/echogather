@@ -2,7 +2,14 @@ import uuid
 
 from pydantic import BaseModel, field_validator
 
-from app.schemas.common import UTCDateTime, normalize_optional_text
+from app.models.enums import ActivityStatus
+from app.schemas.common import (
+    FACEBOOK_URL_ERROR,
+    UTCDateTime,
+    is_facebook_url,
+    normalize_optional_text,
+)
+from app.schemas.group_leader_group_buy import GroupBuyOwnerListItem
 
 
 class GroupLeaderProfileOwnerResponse(BaseModel):
@@ -40,6 +47,16 @@ class UpdateGroupLeaderProfileRequest(BaseModel):
             raise ValueError("團主名稱不可為空白。")
         return trimmed
 
+    @field_validator("facebook_url")
+    @classmethod
+    def _validate_facebook_url(cls, value: str | None) -> str | None:
+        """公開聯絡方式的 Facebook 也必須是連結，與會員聯絡欄位同一套規則。"""
+        if value is None:
+            return None
+        if not is_facebook_url(value):
+            raise ValueError(FACEBOOK_URL_ERROR)
+        return value
+
 
 class UpdateDefaultRulesRequest(BaseModel):
     default_rules: str | None = None
@@ -57,5 +74,22 @@ class DashboardCard(BaseModel):
     target_url: str
 
 
+class DashboardActivityGroup(BaseModel):
+    """圖 20「目前開團」依活動分組。
+
+    同一活動可有多輪（第一團、追加團…），因此開團是活動底下的一層。
+    參考圖另有「活動期間」，但 activity 沒有起訖日期欄位，依使用者
+    2026-07-29 裁決不做該行。
+    """
+
+    activity_id: uuid.UUID
+    activity_name: str
+    activity_image_url: str
+    activity_status: ActivityStatus
+    group_buys: list[GroupBuyOwnerListItem]
+
+
 class DashboardResponse(BaseModel):
     cards: list[DashboardCard]
+    # 只含進行中的開團、不分頁（依使用者裁決）；完整紀錄請看「我的開團」。
+    current_group_buys: list[DashboardActivityGroup]

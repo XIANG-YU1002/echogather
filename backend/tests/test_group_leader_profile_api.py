@@ -150,6 +150,18 @@ def test_dashboard_counts(client, db_session):
         quantity=1,
         status=OrderStatus.PENDING_CONFIRMATION,
     )
+    create_order_with_item(
+        db_session,
+        buyer,
+        group_buy,
+        group_buy_product,
+        quantity=1,
+        status=OrderStatus.PENDING_PAYMENT,
+    )
+    # 已付款的不該被算進待處理
+    create_order_with_item(
+        db_session, buyer, group_buy, group_buy_product, quantity=1, status=OrderStatus.PAID
+    )
 
     headers = _leader_headers(client, leader_user)
     response = client.get("/api/v1/group-leader/dashboard", headers=headers)
@@ -157,6 +169,6 @@ def test_dashboard_counts(client, db_session):
     assert response.status_code == 200
     cards = {card["key"]: card["count"] for card in response.json()["data"]["cards"]}
     assert cards["open_group_buys"] == 1
-    assert cards["pending_confirmation_orders"] == 1
-    assert cards["pending_payment_orders"] == 0
+    # 待處理＝待確認＋待付款（使用者 2026-07-29 說明，兩者都要團主處理）
+    assert cards["pending_orders"] == 2
     assert cards["pending_cancellation_requests"] == 0

@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
-from app.models.enums import CancellationStatus, OrderStatus
+from app.models.enums import CancellationStatus, GroupLeaderOrderStatusFilter, OrderStatus
 from app.models.group_leader import GroupLeaderProfile
 from app.models.order import CancellationRequest, GroupOrder
 from app.repositories import cancellation_repository, group_buy_repository, order_repository, user_repository
@@ -12,10 +12,12 @@ from app.schemas.common import normalize_optional_text
 from app.schemas.group_leader_order import (
     GroupLeaderOrderDetailResponse,
     GroupLeaderOrderListItem,
+    GroupLeaderOrderSummary,
     MemberContactSnapshot,
 )
 from app.schemas.order import CancellationRequestSummary, OrderItemDetail
 from app.services import notification_service
+from app.services.order_service import build_item_summary
 
 _CANCELLABLE_STATUSES = {
     OrderStatus.PENDING_CONFIRMATION,
@@ -61,41 +63,88 @@ def get_orders(
     *,
     group_buy_id: uuid.UUID | None,
     activity_id: uuid.UUID | None,
-    status: OrderStatus | None,
+    status: GroupLeaderOrderStatusFilter | None,
     has_pending_cancellation: bool | None,
     keyword: str | None,
     page: int,
     page_size: int,
-) -> tuple[list[GroupLeaderOrderListItem], int]:
+    newest_first: bool = False,
+) -> tuple[list[GroupLeaderOrderListItem], int, GroupLeaderOrderSummary]:
+    """status 可為單一狀態或複合值 pending（待確認＋待付款），見 enums 的說明。
+
+    回傳的 summary 供圖 25 六張統計卡使用：吃開團／活動／關鍵字條件，但不吃狀態。
+    """
     orders, total = order_repository.list_for_leader(
         db,
         profile.id,
         group_buy_id=group_buy_id,
         activity_id=activity_id,
-        status=status,
+        statuses=status.to_order_statuses() if status is not None else None,
         has_pending_cancellation=has_pending_cancellation,
         keyword=keyword,
         page=page,
         page_size=page_size,
+        newest_first=newest_first,
     )
+
+    # 輪次編號與開團狀態一次查完，避免每列各打一次 DB
+    round_numbers = group_buy_repository.get_round_numbers(
+        db, [order.group_buy_id for order in orders]
+    )
+
     items = []
     for order in orders:
         member = user_repository.get_by_id(db, order.user_id)
         has_pending = cancellation_repository.get_pending_by_order_id(db, order.id) is not None
+        order_items = order_repository.get_items(db, order.id)
+        group_buy = group_buy_repository.get_by_id(db, order.group_buy_id)
         items.append(
             GroupLeaderOrderListItem(
                 id=order.id,
                 order_number=order.order_number,
                 member_nickname=member.nickname if member is not None else "",
+                member_avatar_url=member.avatar_url if member is not None else None,
                 group_buy_id=order.group_buy_id,
                 activity_name=order.activity_name_snapshot,
+                round_number=round_numbers.get(order.group_buy_id, 1),
+                group_buy_status=group_buy.status,
+                representative_image_url=(
+                    order_items[0].image_url_snapshot if order_items else ""
+                ),
+                item_summary=build_item_summary(order_items),
+                item_count=len(order_items),
+                total_quantity=sum(item.quantity for item in order_items),
                 status=order.status,
                 product_total_amount=order.product_total_amount,
                 has_pending_cancellation=has_pending,
                 created_at=order.created_at,
             )
         )
-    return items, total
+
+    counts = order_repository.count_for_leader_grouped_by_status(
+        db,
+        profile.id,
+        group_buy_id=group_buy_id,
+        activity_id=activity_id,
+        keyword=keyword,
+    )
+    summary = GroupLeaderOrderSummary(
+        pending_confirmation=counts.get(OrderStatus.PENDING_CONFIRMATION, 0),
+        pending_payment=counts.get(OrderStatus.PENDING_PAYMENT, 0),
+        paid=counts.get(OrderStatus.PAID, 0),
+        shipped=counts.get(OrderStatus.SHIPPED, 0),
+        completed=counts.get(OrderStatus.COMPLETED, 0),
+        cancelled=counts.get(OrderStatus.CANCELLED, 0),
+        rejected=counts.get(OrderStatus.REJECTED, 0),
+        pending_cancellation=order_repository.count_pending_cancellation_for_leader(
+            db,
+            profile.id,
+            group_buy_id=group_buy_id,
+            activity_id=activity_id,
+            keyword=keyword,
+        ),
+    )
+    return items, total, summary
 
 
 def get_order_detail(

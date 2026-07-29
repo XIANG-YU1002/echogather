@@ -286,9 +286,122 @@ def test_update_group_buy_settings_full_update_without_orders(client, db_session
     assert data["payment_method"] == "bank_transfer"
 
 
+def test_update_group_buy_deadline_can_be_moved_earlier(client, db_session):
+    """依 Business Rules §16.5：截止時間可延長也可縮短，只是不得改到過去。
+
+    實務上因數量不足而提早收單的情況比延後更常見，所以特別留一個回歸測試。
+    """
+    activity = create_activity(db_session)
+    product = create_product(db_session, activity=activity)
+    headers = _leader(client, db_session)
+    payload = _base_payload(product.id, activity_id=str(activity.id), deadline_at=_future_deadline(30))
+    group_buy_id = client.post(
+        "/api/v1/group-leader/group-buys", json=payload, headers=headers
+    ).json()["data"]["id"]
+
+    earlier = client.patch(
+        f"/api/v1/group-leader/group-buys/{group_buy_id}",
+        json={"deadline_at": _future_deadline(2)},
+        headers=headers,
+    )
+    assert earlier.status_code == 200, earlier.text
+    assert earlier.json()["data"]["deadline_at"].startswith(_future_deadline(2)[:10])
+
+    # 改到過去仍要被拒絕
+    past = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    rejected = client.patch(
+        f"/api/v1/group-leader/group-buys/{group_buy_id}",
+        json={"deadline_at": past},
+        headers=headers,
+    )
+    assert rejected.status_code == 422
+    assert rejected.json()["error"]["code"] == "VALIDATION_ERROR"
+
+
+def test_group_buy_contact_must_come_from_leader_profile(client, db_session):
+    """開團的主要聯絡方式必須取自團主資料已設定的公開聯絡方式。
+
+    依使用者 2026-07-29 裁決：不在開團另外輸入，避免同一位團主在不同開團
+    留下不一致或過期的聯絡資訊。
+    """
+    activity = create_activity(db_session)
+    product = create_product(db_session, activity=activity)
+    # 團主資料只設定 Discord（factories 預設），沒有 Facebook
+    headers = _leader(client, db_session)
+
+    not_set = client.post(
+        "/api/v1/group-leader/group-buys",
+        json=_base_payload(
+            product.id,
+            activity_id=str(activity.id),
+            contact_platform="facebook",
+            contact_value="https://www.facebook.com/moon.group",
+        ),
+        headers=headers,
+    )
+    assert not_set.status_code == 422
+    assert not_set.json()["error"]["code"] == "CONTACT_NOT_SET_IN_PROFILE"
+
+    mismatch = client.post(
+        "/api/v1/group-leader/group-buys",
+        json=_base_payload(
+            product.id,
+            activity_id=str(activity.id),
+            contact_platform="discord",
+            contact_value="someone_else",
+        ),
+        headers=headers,
+    )
+    assert mismatch.status_code == 422
+    assert mismatch.json()["error"]["code"] == "CONTACT_VALUE_MISMATCH"
+
+    # 與團主資料一致才能建立（factories 的 discord_contact 為 leader_discord）
+    created = client.post(
+        "/api/v1/group-leader/group-buys",
+        json=_base_payload(product.id, activity_id=str(activity.id)),
+        headers=headers,
+    )
+    assert created.status_code == 201, created.text
+    assert created.json()["data"]["contact_value"] == "leader_discord"
+
+
+def test_group_buy_facebook_contact_must_be_url(client, db_session):
+    """團主資料的 Facebook 必須是連結，開團沿用時自然也是連結。"""
+    activity = create_activity(db_session)
+    product = create_product(db_session, activity=activity)
+    headers = _leader(
+        client, db_session, facebook_url="https://www.facebook.com/moon.group"
+    )
+
+    created = client.post(
+        "/api/v1/group-leader/group-buys",
+        json=_base_payload(
+            product.id,
+            activity_id=str(activity.id),
+            contact_platform="facebook",
+            contact_value="https://www.facebook.com/moon.group",
+        ),
+        headers=headers,
+    )
+    assert created.status_code == 201, created.text
+    assert created.json()["data"]["contact_value"] == "https://www.facebook.com/moon.group"
+
+    # 團主資料本身不接受只填帳號名稱
+    rejected = client.patch(
+        "/api/v1/group-leader/profile",
+        json={"facebook_url": "my_fb_name"},
+        headers=headers,
+    )
+    assert rejected.status_code == 422
+    assert "facebook_url" in rejected.json()["error"]["details"]["fields"]
+
+
 def test_update_group_buy_settings_frozen_after_orders(client, db_session):
     leader_user = create_user(db_session)
-    leader_profile = create_group_leader_profile(db_session, user=leader_user, complete=True)
+    # 團主同時設定 Discord 與 LINE，才能測「有訂單後仍可換主要聯絡方式」
+    leader_profile = create_group_leader_profile(
+        db_session, user=leader_user, complete=True, line_contact="leader_line"
+    )
     activity = create_activity(db_session)
     product = create_product(db_session, activity=activity)
     group_buy = create_group_buy(db_session, group_leader_profile=leader_profile, activity=activity)
@@ -306,13 +419,15 @@ def test_update_group_buy_settings_frozen_after_orders(client, db_session):
     assert frozen_response.status_code == 409
     assert frozen_response.json()["error"]["code"] == "GROUP_BUY_FIELDS_FROZEN"
 
+    # 只送平台時後端自動採用團主資料該平台的值
     allowed_response = client.patch(
         f"/api/v1/group-leader/group-buys/{group_buy.id}",
-        json={"contact_value": "new_contact"},
+        json={"contact_platform": "line"},
         headers=headers,
     )
-    assert allowed_response.status_code == 200
-    assert allowed_response.json()["data"]["contact_value"] == "new_contact"
+    assert allowed_response.status_code == 200, allowed_response.text
+    assert allowed_response.json()["data"]["contact_platform"] == "line"
+    assert allowed_response.json()["data"]["contact_value"] == "leader_line"
     assert allowed_response.json()["data"]["has_orders"] is True
     assert set(allowed_response.json()["data"]["editable_fields"]) == {
         "deadline_at",

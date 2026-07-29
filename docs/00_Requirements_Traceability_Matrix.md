@@ -98,10 +98,11 @@
 - **Business Rules：** §11 Product Rules、§12 Character Rules、§13 Image Rules
 
 ### 3.6 Group Buy（公開比較 + 團主建立/編輯）
-- **頁面：** 商品頁開團比較、開團詳情、建立開團 Wizard、團主開團列表/詳情
-- **API：** GET /products/{id}/group-buys、GET /group-buys/{id}、/group-leader/group-buys CRUD、close
+- **頁面：** 商品頁開團比較、開團詳情、建立開團 Wizard、團主開團列表/詳情、商品訂購總覽
+- **API：** GET /products/{id}/group-buys、GET /group-buys/{id}、/group-leader/group-buys CRUD、close、GET /group-leader/group-buys/open、GET /group-leader/group-buys/{id}/product-orders
 - **資料表：** group_buy, group_buy_product
 - **Business Rules：** §15 Creation、§16 Edit and Status、§17 Comparison
+- **備註：** 輪次編號（第 N 團）與各項統計為聚合查詢，無新欄位；統計基準見 API Design §23.1
 
 ### 3.7 Follow List
 - **頁面：** 跟團清單頁
@@ -132,6 +133,8 @@
 - **API：** GET /group-leader/dashboard、GET /admin/dashboard、GET /admin/dashboard/current-group-buys
 - **資料表：** 聚合查詢，無新資料表
 - **Business Rules：** §27
+- **備註：** 兩個 Dashboard 的回應結構各自獨立（團主端另含 current_group_buys），
+  僅共用 DashboardCard；管理員的「目前開團」是獨立分頁端點
 
 ### 3.12 Global Search
 - **頁面：** 搜尋結果頁

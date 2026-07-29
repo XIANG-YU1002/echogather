@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import PaginationParams, get_current_active_group_leader_profile, get_db
 from app.core.responses import envelope, paginated_envelope
-from app.models.enums import OrderStatus
+from app.models.enums import GroupLeaderOrderStatusFilter
 from app.models.group_leader import GroupLeaderProfile
 from app.schemas.group_leader_order import ProcessCancellationRequest, RejectOrderRequest
 from app.services import group_leader_order_service
@@ -17,14 +17,20 @@ router = APIRouter(prefix="/group-leader", tags=["group-leader-orders"])
 def get_orders(
     group_buy_id: uuid.UUID | None = Query(None),
     activity_id: uuid.UUID | None = Query(None),
-    status: OrderStatus | None = Query(None),
+    status: GroupLeaderOrderStatusFilter | None = Query(
+        None, description="單一訂單狀態，或複合值 pending＝待處理（待確認＋待付款）"
+    ),
     has_pending_cancellation: bool | None = Query(None),
     keyword: str | None = Query(None),
+    newest_first: bool = Query(
+        False,
+        description="改為最新提交在前；預設依 Business Rules §24.1 先喊先得（最早在前）",
+    ),
     pagination: PaginationParams = Depends(),
     profile: GroupLeaderProfile = Depends(get_current_active_group_leader_profile),
     db: Session = Depends(get_db),
 ) -> dict:
-    items, total = group_leader_order_service.get_orders(
+    items, total, summary = group_leader_order_service.get_orders(
         db,
         profile,
         group_buy_id=group_buy_id,
@@ -34,9 +40,14 @@ def get_orders(
         keyword=keyword,
         page=pagination.page,
         page_size=pagination.page_size,
+        newest_first=newest_first,
     )
     return paginated_envelope(
-        [i.model_dump(mode="json") for i in items], pagination.page, pagination.page_size, total
+        [i.model_dump(mode="json") for i in items],
+        pagination.page,
+        pagination.page_size,
+        total,
+        summary=summary.model_dump(mode="json"),
     )
 
 
