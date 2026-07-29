@@ -14,6 +14,7 @@ from app.schemas.group_leader_order import (
     GroupLeaderOrderListItem,
     GroupLeaderOrderSummary,
     MemberContactSnapshot,
+    MergeOrdersRequest,
 )
 from app.schemas.order import CancellationRequestSummary, OrderItemDetail
 from app.services import notification_service
@@ -157,6 +158,8 @@ def get_order_detail(
     pending = next(
         (r for r in cancellation_requests if r.status == CancellationStatus.PENDING), None
     )
+    # 收單期限讀開團的即時值，團主延期後詳情頁要跟著更新
+    group_buy = group_buy_repository.get_by_id(db, order.group_buy_id)
 
     return GroupLeaderOrderDetailResponse(
         id=order.id,
@@ -164,13 +167,17 @@ def get_order_detail(
         status=order.status,
         rejection_reason=order.rejection_reason,
         product_total_amount=order.product_total_amount,
+        paid_amount=order.paid_amount,
         member_nickname=member.nickname if member is not None else "",
+        member_avatar_url=member.avatar_url if member is not None else None,
         member_contacts=MemberContactSnapshot(
             facebook=order.member_facebook_contact_snapshot,
             discord=order.member_discord_contact_snapshot,
             line=order.member_line_contact_snapshot,
         ),
         activity_name=order.activity_name_snapshot,
+        group_leader_name=order.group_leader_name_snapshot,
+        deadline_at=group_buy.deadline_at,
         payment_method=order.payment_method_snapshot,
         payment_method_note=order.payment_method_note_snapshot,
         requires_second_payment=order.requires_second_payment_snapshot,
@@ -183,6 +190,8 @@ def get_order_detail(
                 id=item.id,
                 product_name_snapshot=item.product_name_snapshot,
                 image_url_snapshot=item.image_url_snapshot,
+                # 多角色商品要顯示所選角色，原本漏傳導致團主端一律看不到
+                chosen_character_name=item.chosen_character_name_snapshot,
                 unit_price=item.unit_price,
                 quantity=item.quantity,
                 subtotal=item.subtotal,
@@ -197,6 +206,212 @@ def get_order_detail(
         created_at=order.created_at,
         updated_at=order.updated_at,
     )
+
+
+# 可合併的狀態（依使用者 2026-07-29 裁決）。已出貨之後的訂單不再合併，
+# 已取消／已拒絕也不列入。
+MERGEABLE_STATUSES = (
+    OrderStatus.PENDING_CONFIRMATION,
+    OrderStatus.PENDING_PAYMENT,
+    OrderStatus.PAID,
+)
+
+
+def get_mergeable_orders(
+    db: Session, profile: GroupLeaderProfile, order_id: uuid.UUID
+) -> list[GroupLeaderOrderListItem]:
+    """可與指定訂單合併的其他訂單：同開團、同會員、狀態可合併、且沒有待處理取消申請。"""
+    order = _load_owned_order(db, profile, order_id)
+    # 這張訂單本身不可合併時就沒有合併的餘地，直接回空清單，
+    # 前端也就不會顯示「合併訂單」區塊（使用者 2026-07-29 指示）。
+    if order.status not in MERGEABLE_STATUSES:
+        return []
+    if cancellation_repository.get_pending_by_order_id(db, order.id) is not None:
+        return []
+
+    candidates = order_repository.list_same_member_orders_in_group_buy(
+        db,
+        order.group_buy_id,
+        order.user_id,
+        statuses=MERGEABLE_STATUSES,
+        exclude_order_id=order.id,
+    )
+    member = user_repository.get_by_id(db, order.user_id)
+    group_buy = group_buy_repository.get_by_id(db, order.group_buy_id)
+    round_number = group_buy_repository.get_round_number(db, group_buy)
+
+    items = []
+    for candidate in candidates:
+        # 有待處理取消申請的訂單不能合併——那張訂單的去向還沒定案
+        if cancellation_repository.get_pending_by_order_id(db, candidate.id) is not None:
+            continue
+        candidate_items = order_repository.get_items(db, candidate.id)
+        items.append(
+            GroupLeaderOrderListItem(
+                id=candidate.id,
+                order_number=candidate.order_number,
+                member_nickname=member.nickname if member is not None else "",
+                member_avatar_url=member.avatar_url if member is not None else None,
+                group_buy_id=candidate.group_buy_id,
+                activity_name=candidate.activity_name_snapshot,
+                round_number=round_number,
+                group_buy_status=group_buy.status,
+                representative_image_url=(
+                    candidate_items[0].image_url_snapshot if candidate_items else ""
+                ),
+                item_summary=build_item_summary(candidate_items),
+                item_count=len(candidate_items),
+                total_quantity=sum(item.quantity for item in candidate_items),
+                status=candidate.status,
+                product_total_amount=candidate.product_total_amount,
+                has_pending_cancellation=False,
+                created_at=candidate.created_at,
+            )
+        )
+    return items
+
+
+def merge_orders(
+    db: Session,
+    profile: GroupLeaderProfile,
+    order_id: uuid.UUID,
+    payload: MergeOrdersRequest,
+) -> GroupLeaderOrderDetailResponse:
+    """把同會員同開團的多筆訂單合併成一筆（依使用者 2026-07-29 裁決）。
+
+    規則：
+    - 保留哪一張由 keep 決定（oldest／newest），保留者的訂單編號與建立時間留下；
+      建立時間會影響先喊先得的排隊順位，所以這是團主的選擇而非系統決定。
+    - 同商品同角色的明細數量相加（order_item 有 (order,product,character) 唯一約束）。
+    - 合併後狀態取進度最慢者：含待確認就是待確認。
+    - 已付款訂單併入時，那部分的錢已收，記入 paid_amount 與待收金額分開顯示。
+    - 被併入的訂單標記為已取消，並在狀態歷史註明併入哪一張。
+    """
+    if not payload.merge_with_order_ids:
+        raise AppError(422, "VALIDATION_ERROR", "請選擇要合併的訂單。")
+
+    # 一起鎖定，避免併發合併造成明細重複搬移
+    base = _load_owned_order(db, profile, order_id, for_update=True)
+    others = []
+    for other_id in payload.merge_with_order_ids:
+        if other_id == order_id:
+            raise AppError(422, "VALIDATION_ERROR", "不能與自己合併。")
+        other = _load_owned_order(db, profile, other_id, for_update=True)
+        if other.group_buy_id != base.group_buy_id:
+            raise AppError(409, "ORDER_MERGE_DIFFERENT_GROUP_BUY", "只能合併同一個開團的訂單。")
+        if other.user_id != base.user_id:
+            raise AppError(409, "ORDER_MERGE_DIFFERENT_MEMBER", "只能合併同一位會員的訂單。")
+        others.append(other)
+
+    all_orders = [base, *others]
+    for order in all_orders:
+        if order.status not in MERGEABLE_STATUSES:
+            raise AppError(
+                409,
+                "ORDER_MERGE_STATUS_NOT_ALLOWED",
+                "只有待確認、待付款、已付款的訂單可以合併。",
+                {"order_number": order.order_number, "status": order.status.value},
+            )
+        if cancellation_repository.get_pending_by_order_id(db, order.id) is not None:
+            raise AppError(
+                409,
+                "ORDER_MERGE_HAS_PENDING_CANCELLATION",
+                "有待處理取消申請的訂單無法合併，請先處理該申請。",
+                {"order_number": order.order_number},
+            )
+
+    # 依建立時間決定保留哪一張（同時間時以 id 穩定排序）
+    ordered = sorted(all_orders, key=lambda o: (o.created_at, str(o.id)))
+    target = ordered[0] if payload.keep == "oldest" else ordered[-1]
+    sources = [order for order in all_orders if order.id != target.id]
+
+    # 目標訂單既有明細，用 (商品, 角色) 當索引以便數量相加
+    target_items = {
+        (item.group_buy_product_id, item.chosen_character_id): item
+        for item in order_repository.get_items(db, target.id)
+    }
+    # 已收金額＝各訂單已收部分的總和。已付款訂單是全額已收；其餘取它自己的
+    # paid_amount，這樣先前合併留下的已收金額不會在二次合併時被丟掉。
+    paid_amount = sum(
+        (
+            order.product_total_amount
+            if order.status == OrderStatus.PAID
+            else order.paid_amount
+        )
+        for order in all_orders
+    )
+
+    for source in sources:
+        for item in order_repository.get_items(db, source.id):
+            key = (item.group_buy_product_id, item.chosen_character_id)
+            existing = target_items.get(key)
+            if existing is not None:
+                existing.quantity += item.quantity
+                existing.subtotal = existing.unit_price * existing.quantity
+            else:
+                # 複製到目標訂單，來源訂單保留自己的明細作為歷史紀錄——若直接搬移，
+                # 被合併的訂單會變成沒有商品的空殼，列表上顯示「共 0 件商品」。
+                # 來源訂單已標記為 cancelled，依 §20.1 不計入庫存佔用量，不會重複佔用。
+                target_items[key] = order_repository.create_order_item(
+                    db,
+                    order_id=target.id,
+                    group_buy_product_id=item.group_buy_product_id,
+                    chosen_character_id=item.chosen_character_id,
+                    chosen_character_name_snapshot=item.chosen_character_name_snapshot,
+                    product_name_snapshot=item.product_name_snapshot,
+                    image_url_snapshot=item.image_url_snapshot,
+                    unit_price=item.unit_price,
+                    quantity=item.quantity,
+                    subtotal=item.subtotal,
+                )
+    db.flush()
+
+    merged_items = order_repository.get_items(db, target.id)
+    target.product_total_amount = sum(item.subtotal for item in merged_items)
+    target.paid_amount = paid_amount
+    # 合併後狀態（依使用者 2026-07-29 裁決）：團主願意合併就代表已確認這些訂單，
+    # 因此待確認的部分直接進到待付款；只有全部都已付款時才維持已付款。
+    # 「部分已付款」不另外新增狀態，由 paid_amount 與待收金額的差額表達。
+    all_paid = all(order.status == OrderStatus.PAID for order in all_orders)
+    target.status = OrderStatus.PAID if all_paid else OrderStatus.PENDING_PAYMENT
+
+    for source in sources:
+        source.status = OrderStatus.CANCELLED
+        order_repository.create_status_history(
+            db,
+            source.id,
+            OrderStatus.CANCELLED,
+            note=f"已合併至訂單 {target.order_number}",
+        )
+
+    order_repository.create_status_history(
+        db,
+        target.id,
+        target.status,
+        note="已合併 " + "、".join(source.order_number for source in sources),
+    )
+
+    outstanding = target.product_total_amount - target.paid_amount
+    if target.status == OrderStatus.PAID:
+        payment_note = "款項已全數收到，無需再付款。"
+    elif target.paid_amount > 0:
+        payment_note = f"其中 NT${target.paid_amount} 已收到，尚需付款 NT${outstanding}。"
+    else:
+        payment_note = f"合併後應付金額為 NT${outstanding}。"
+
+    notification_service.notify_order_event(
+        db,
+        user_id=target.user_id,
+        order_id=target.id,
+        title="訂單已合併",
+        message=(
+            f"團主已將你的訂單 {'、'.join(s.order_number for s in sources)} "
+            f"合併至 {target.order_number}，請以合併後的訂單為準。{payment_note}"
+        ),
+    )
+
+    db.commit()
+    return get_order_detail(db, profile, target.id)
 
 
 def _transition(
@@ -217,6 +432,10 @@ def _transition(
             {"current_status": order.status.value},
         )
     order.status = to_status
+    # 進到已付款代表全額收齊；合併過的訂單原本只收了一部分，這裡要補齊，
+    # 否則畫面會出現「已付款」卻還顯示待收金額的矛盾。
+    if to_status == OrderStatus.PAID:
+        order.paid_amount = order.product_total_amount
     order_repository.create_status_history(db, order.id, to_status, note)
     return order
 

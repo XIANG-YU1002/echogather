@@ -6724,6 +6724,12 @@ a.glp-activity:hover {
   margin-top: 0.5rem;
 }
 
+/* 團規原文區塊：保留團主寫的換行與自訂編號，不加項目符號 */
+.gbe-rules-text {
+  font-size: 0.92rem;
+  color: var(--color-text);
+}
+
 .gbe-rules {
   margin: 0;
   padding-left: 1.25rem;
@@ -7450,6 +7456,395 @@ a.glp-activity:hover {
 @media (max-width: 767px) {
   .ol-summary {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   訂單詳情（依圖 26）：左主欄資訊卡＋右側操作與聯絡資訊
+---------------------------------------------------------------------------- */
+.od-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.od-timeline-wrap {
+  display: flex;
+  align-items: flex-start;
+  gap: 1.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.od-timeline-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  padding-top: 0.6rem;
+  white-space: nowrap;
+}
+
+.od-timeline {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+/* 圓點內是數字（圖 17／18 是勾勾與實心點），未達成步驟需要看得見的灰字 */
+.od-timeline .gla-step-dot {
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.od-timeline .gla-step-done .gla-step-dot,
+.od-timeline .gla-step-current .gla-step-dot {
+  color: #fff;
+}
+
+/* 圖 26 的目前步驟是紫底白字，不是圖 17／18 的橘色圓框 */
+.od-timeline .gla-step-current .gla-step-dot {
+  background-color: var(--color-primary);
+  border-color: var(--color-primary);
+  border-width: 2px;
+}
+
+.od-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 22rem;
+  gap: 1.25rem;
+  align-items: start;
+}
+
+.od-main,
+.od-side {
+  min-width: 0;
+}
+
+/* 基本資訊／開團資訊的欄位清單：標籤配 icon，值靠左 */
+.od-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  margin: 0;
+}
+
+.od-info > div {
+  display: grid;
+  grid-template-columns: 8rem minmax(0, 1fr);
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.od-info dt {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.od-info dt svg {
+  width: 0.95rem;
+  height: 0.95rem;
+  flex-shrink: 0;
+}
+
+.od-info dd {
+  margin: 0;
+  font-size: 0.92rem;
+  overflow-wrap: anywhere;
+}
+
+.od-item-character,
+.od-item-activity {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.od-item-character {
+  color: var(--color-primary);
+}
+
+.od-total-label {
+  text-align: right;
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.od-total-value {
+  font-weight: 700;
+  color: var(--color-primary);
+  font-size: 1.05rem;
+}
+
+/* 開團資訊左右兩欄（依圖 26） */
+.od-group-buy {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 1.5rem;
+}
+
+.od-rules .gbe-label {
+  display: block;
+  margin-top: 0.8rem;
+}
+
+/* 團規原文：保留團主的換行與自訂編號，不加項目符號 */
+.od-rules-text {
+  font-size: 0.85rem;
+  line-height: 1.9;
+}
+
+.od-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  margin-bottom: 0.6rem;
+  height: 44px;
+  font-weight: 700;
+}
+
+.od-action-btn svg {
+  width: 1.05rem;
+  height: 1.05rem;
+}
+
+/* 依圖 26：拒絕訂單是紅框白底 */
+.od-reject-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  width: 100%;
+  height: 44px;
+  border: 1px solid var(--color-danger);
+  border-radius: var(--radius);
+  background-color: #fff;
+  color: var(--color-danger);
+  font-size: 0.95rem;
+  font-family: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.od-reject-btn:hover:not(:disabled) {
+  background-color: #fdeaea;
+}
+
+.od-reject-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.od-reject-btn svg {
+  width: 1.05rem;
+  height: 1.05rem;
+}
+
+.od-reject-reason {
+  margin-top: 1rem;
+}
+
+.od-reject-reason .gbe-label {
+  display: block;
+  margin-bottom: 0.35rem;
+}
+
+.od-reject-reason textarea {
+  width: 100%;
+  resize: vertical;
+}
+
+/* 會員聯絡資訊小卡（依圖 26） */
+.od-contacts {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.od-contact {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+.od-contact-icon {
+  width: 2rem;
+  height: 2rem;
+  flex-shrink: 0;
+}
+
+.od-contact-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+
+.od-contact-platform {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.od-contact-value {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.od-contact-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--color-primary);
+  font-size: 0.78rem;
+  font-family: inherit;
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.od-contact-action:hover {
+  text-decoration: underline;
+}
+
+.od-cancel-reason {
+  margin: 0 0 0.75rem;
+  font-size: 0.88rem;
+}
+
+.od-cancel-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+}
+
+/* 訂單提醒（依圖 26 的藍底提示卡） */
+.od-notice {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+  background-color: #eef4ff;
+  border: 1px solid #c7d9fe;
+  border-radius: var(--radius);
+  padding: 0.9rem 1.1rem;
+}
+
+.od-notice-icon {
+  width: 1.2rem;
+  height: 1.2rem;
+  flex-shrink: 0;
+  color: #3b6fd4;
+  margin-top: 0.1rem;
+}
+
+.od-notice-title {
+  margin: 0 0 0.25rem;
+  font-weight: 700;
+  color: #2c5aa8;
+}
+
+.od-notice-text {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.7;
+  color: var(--color-text-muted);
+}
+
+.od-paid-value {
+  font-weight: 700;
+  color: var(--color-success);
+}
+
+/* 訂單合併：可合併的候選清單 */
+.od-merge-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.od-merge-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
+.od-merge-item:hover {
+  border-color: var(--color-primary);
+}
+
+.od-merge-item input {
+  margin-top: 0.2rem;
+  flex-shrink: 0;
+}
+
+.od-merge-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.od-merge-number {
+  font-weight: 600;
+  font-size: 0.88rem;
+}
+
+.od-merge-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.od-merge-time {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.od-merge-keep-label {
+  display: block;
+  margin-top: 0.5rem;
+}
+
+.od-merge-btn {
+  margin-top: 0.75rem;
+}
+
+.od-back {
+  margin-top: 1.25rem;
+}
+
+@media (max-width: 1023px) {
+  .od-layout,
+  .od-group-buy {
+    grid-template-columns: 1fr;
+  }
+  .od-timeline-wrap {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+  .od-timeline-title {
+    padding-top: 0;
   }
 }
 

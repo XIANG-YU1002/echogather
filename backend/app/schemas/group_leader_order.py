@@ -1,6 +1,7 @@
 import uuid
+from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.models.enums import ContactPlatform, GroupBuyStatus, OrderStatus, PaymentMethod
 from app.schemas.common import Money, UTCDateTime
@@ -62,9 +63,15 @@ class GroupLeaderOrderDetailResponse(BaseModel):
     status: OrderStatus
     rejection_reason: str | None
     product_total_amount: Money
+    # 合併訂單時已收的金額；一般訂單為 0（付款狀態由 status 表達）
+    paid_amount: Money
     member_nickname: str
+    member_avatar_url: str | None
     member_contacts: MemberContactSnapshot
     activity_name: str
+    group_leader_name: str
+    # 收單期限取自開團的即時值（訂單未快照，團主延期時會一併更新），同會員端訂單詳情
+    deadline_at: UTCDateTime
     payment_method: PaymentMethod
     payment_method_note: str | None
     requires_second_payment: bool
@@ -78,6 +85,17 @@ class GroupLeaderOrderDetailResponse(BaseModel):
     available_actions: list[str]
     created_at: UTCDateTime
     updated_at: UTCDateTime
+
+
+class MergeOrdersRequest(BaseModel):
+    """訂單合併。keep 決定保留哪一張的訂單編號與建立時間。
+
+    建立時間會影響先喊先得的排隊順位（Business Rules §24.1），因此由團主選擇
+    而非系統代為決定。
+    """
+
+    merge_with_order_ids: list[uuid.UUID] = Field(min_length=1)
+    keep: Literal["oldest", "newest"] = "oldest"
 
 
 class RejectOrderRequest(BaseModel):

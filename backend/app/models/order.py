@@ -52,6 +52,11 @@ class GroupOrder(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     )
     rejection_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     product_total_amount: Mapped[object] = mapped_column(Numeric(12, 2), nullable=False)
+    # 合併訂單時已收的金額（見 migration 0010）。一般訂單為 0——付款狀態由 status 表達，
+    # 只有把已付款的訂單併進未付款訂單時，才需要把已收與待收分開。
+    paid_amount: Mapped[object] = mapped_column(
+        Numeric(12, 2), nullable=False, server_default="0"
+    )
     group_leader_name_snapshot: Mapped[str] = mapped_column(String(50), nullable=False)
     activity_name_snapshot: Mapped[str] = mapped_column(String(150), nullable=False)
     payment_method_snapshot: Mapped[str] = mapped_column(payment_method_enum, nullable=False)
@@ -74,6 +79,10 @@ class GroupOrder(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     __table_args__ = (
         CheckConstraint(
             "product_total_amount >= 0", name="ck_group_order_product_total_amount_non_negative"
+        ),
+        CheckConstraint(
+            "paid_amount >= 0 AND paid_amount <= product_total_amount",
+            name="ck_group_order_paid_amount_range",
         ),
         CheckConstraint(
             "length(trim(rules_snapshot)) > 0", name="ck_group_order_rules_snapshot_not_blank"

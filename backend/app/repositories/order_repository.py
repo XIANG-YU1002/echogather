@@ -194,6 +194,36 @@ def get_group_buy_for_update(db: Session, group_buy_id: uuid.UUID) -> GroupBuy |
     return db.execute(stmt).scalar_one_or_none()
 
 
+def list_same_member_orders_in_group_buy(
+    db: Session,
+    group_buy_id: uuid.UUID,
+    user_id: uuid.UUID,
+    *,
+    statuses: Sequence[OrderStatus],
+    exclude_order_id: uuid.UUID | None = None,
+    for_update: bool = False,
+) -> list[GroupOrder]:
+    """同一會員在同一開團的訂單（訂單合併用）。
+
+    依建立時間遞增排序，讓「保留最舊」與「保留最新」都能直接取頭尾。
+    for_update 供合併時鎖定，避免併發合併同一批訂單。
+    """
+    stmt = (
+        select(GroupOrder)
+        .where(
+            GroupOrder.group_buy_id == group_buy_id,
+            GroupOrder.user_id == user_id,
+            GroupOrder.status.in_(tuple(statuses)),
+        )
+        .order_by(GroupOrder.created_at.asc(), GroupOrder.id.asc())
+    )
+    if exclude_order_id is not None:
+        stmt = stmt.where(GroupOrder.id != exclude_order_id)
+    if for_update:
+        stmt = stmt.with_for_update()
+    return db.execute(stmt).scalars().all()
+
+
 def _leader_orders_stmt(
     group_leader_profile_id: uuid.UUID,
     *,

@@ -30,6 +30,18 @@ export function getGroupLeaderOrderDetail(orderId, token) {
   return apiRequest(`/group-leader/orders/${orderId}`, { token });
 }
 
+export function getMergeableOrders(orderId, token) {
+  return apiRequest(`/group-leader/orders/${orderId}/mergeable`, { token });
+}
+
+export function mergeOrders(orderId, { mergeWithOrderIds, keep }, token) {
+  return apiRequest(`/group-leader/orders/${orderId}/merge`, {
+    method: "POST",
+    body: { merge_with_order_ids: mergeWithOrderIds, keep },
+    token,
+  });
+}
+
 export function acceptOrder(orderId, token) {
   return apiRequest(`/group-leader/orders/${orderId}/accept`, { method: "POST", token });
 }

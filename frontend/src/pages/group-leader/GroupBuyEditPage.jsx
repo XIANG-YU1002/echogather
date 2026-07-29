@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { getActivityProducts } from "../../api/activities.js";
 import {
   addGroupBuyProduct,
@@ -46,7 +46,6 @@ function toDatetimeLocal(isoString) {
 export default function GroupBuyEditPage() {
   const { groupBuyId } = useParams();
   const { token } = useAuth();
-  const navigate = useNavigate();
 
   const [groupBuy, setGroupBuy] = useState(null);
   const [error, setError] = useState(false);
@@ -237,11 +236,6 @@ export default function GroupBuyEditPage() {
   const paymentMethodLabel =
     PAYMENT_METHODS.find((option) => option.value === groupBuy.payment_method)?.label ??
     groupBuy.payment_method;
-  const contactPlatformLabel =
-    CONTACT_PLATFORMS.find((option) => option.value === groupBuy.contact_platform)?.label ??
-    groupBuy.contact_platform;
-  // 團規以換行分條顯示（唯讀時）
-  const ruleLines = groupBuy.rules.split("\n").filter((line) => line.trim());
 
   return (
     <>
@@ -506,11 +500,8 @@ export default function GroupBuyEditPage() {
               onChange={(event) => setSettings((prev) => ({ ...prev, rules: event.target.value }))}
             />
           ) : (
-            <ul className="gbe-rules">
-              {ruleLines.map((line, index) => (
-                <li key={index}>{line}</li>
-              ))}
-            </ul>
+            /* 保留團主原文與換行，不另外加標號／項目符號，否則會與團主自己寫的編號重複 */
+            <div className="rules-text gbe-rules-text">{groupBuy.rules}</div>
           )}
         </section>
 

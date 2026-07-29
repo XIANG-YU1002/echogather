@@ -7,7 +7,11 @@ from app.api.deps import PaginationParams, get_current_active_group_leader_profi
 from app.core.responses import envelope, paginated_envelope
 from app.models.enums import GroupLeaderOrderStatusFilter
 from app.models.group_leader import GroupLeaderProfile
-from app.schemas.group_leader_order import ProcessCancellationRequest, RejectOrderRequest
+from app.schemas.group_leader_order import (
+    MergeOrdersRequest,
+    ProcessCancellationRequest,
+    RejectOrderRequest,
+)
 from app.services import group_leader_order_service
 
 router = APIRouter(prefix="/group-leader", tags=["group-leader-orders"])
@@ -49,6 +53,29 @@ def get_orders(
         total,
         summary=summary.model_dump(mode="json"),
     )
+
+
+@router.get("/orders/{order_id}/mergeable")
+def get_mergeable_orders(
+    order_id: uuid.UUID,
+    profile: GroupLeaderProfile = Depends(get_current_active_group_leader_profile),
+    db: Session = Depends(get_db),
+) -> dict:
+    """可與此訂單合併的其他訂單（同開團、同會員、狀態可合併、無待處理取消申請）。"""
+    items = group_leader_order_service.get_mergeable_orders(db, profile, order_id)
+    return envelope([i.model_dump(mode="json") for i in items])
+
+
+@router.post("/orders/{order_id}/merge")
+def merge_orders(
+    order_id: uuid.UUID,
+    payload: MergeOrdersRequest,
+    profile: GroupLeaderProfile = Depends(get_current_active_group_leader_profile),
+    db: Session = Depends(get_db),
+) -> dict:
+    """合併同會員同開團的多筆訂單。回傳合併後保留的那張訂單詳情。"""
+    result = group_leader_order_service.merge_orders(db, profile, order_id, payload)
+    return envelope(result.model_dump(mode="json"))
 
 
 @router.get("/orders/{order_id}")
