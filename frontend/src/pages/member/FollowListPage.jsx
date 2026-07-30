@@ -26,6 +26,7 @@ import {
   CreditCardIcon,
   CartIcon,
   GiftIcon,
+  InfoIcon,
   RefreshIcon,
   TrashIcon,
   UsersIcon,
@@ -33,7 +34,7 @@ import {
 
 const PAYMENT_METHOD_LABELS = {
   bank_transfer: "匯款",
-  cash_on_delivery: "取貨付款",
+  cash_on_delivery: "取貨付款",
 };
 const CONTACT_PLATFORM_LABELS = { facebook: "Facebook", discord: "Discord", line: "LINE" };
 
@@ -307,7 +308,7 @@ export default function FollowListPage() {
             </div>
 
             <div className="info-note" style={{ marginTop: "1.25rem" }}>
-              <span aria-hidden="true">ⓘ</span>
+              <InfoIcon />
               送出後才會正式建立訂單，商品總額不含二補、國際運費與國內運費。
             </div>
           </div>
@@ -348,7 +349,7 @@ export default function FollowListPage() {
               <span className="fl-total-value">NT$ {followList.estimated_product_total}</span>
             </div>
             <div className="info-note purple">
-              <span aria-hidden="true">ⓘ</span>
+              <InfoIcon />
               其他費用將由團主後續通知，不包含於商品總額。
             </div>
             <Button

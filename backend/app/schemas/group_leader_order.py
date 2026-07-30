@@ -5,7 +5,11 @@ from pydantic import BaseModel, Field
 
 from app.models.enums import ContactPlatform, GroupBuyStatus, OrderStatus, PaymentMethod
 from app.schemas.common import Money, UTCDateTime
-from app.schemas.order import CancellationRequestSummary, OrderItemDetail
+from app.schemas.order import (
+    CancellationRequestSummary,
+    OrderItemDetail,
+    UnmergeRequestSummary,
+)
 
 
 class GroupLeaderOrderListItem(BaseModel):
@@ -65,6 +69,9 @@ class GroupLeaderOrderDetailResponse(BaseModel):
     product_total_amount: Money
     # 合併訂單時已收的金額；一般訂單為 0（付款狀態由 status 表達）
     paid_amount: Money
+    # 待收款＝總額－已收。由後端算並統一用 Money 格式，前端不自行相減，
+    # 否則會像先前那樣顯示成 6996 而不是 6996.00。
+    outstanding_amount: Money
     member_nickname: str
     member_avatar_url: str | None
     member_contacts: MemberContactSnapshot
@@ -82,6 +89,10 @@ class GroupLeaderOrderDetailResponse(BaseModel):
     items: list[OrderItemDetail]
     pending_cancellation_request: CancellationRequestSummary | None
     cancellation_requests: list[CancellationRequestSummary]
+    # 會員提出的拆單申請（使用者 2026-07-30 需求）。有待處理申請時圖 26 會顯示
+    # 「執行拆單／拒絕」區塊，內含這批會拆回哪幾張訂單。
+    pending_unmerge_request: UnmergeRequestSummary | None = None
+    unmerge_requests: list[UnmergeRequestSummary] = []
     available_actions: list[str]
     created_at: UTCDateTime
     updated_at: UTCDateTime

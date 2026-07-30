@@ -7,6 +7,14 @@ export function getMyAnnouncements(token, { groupBuyId, page = 1, pageSize = 20 
   });
 }
 
+/** 圖 27 表單的通知對象預覽：發布前先算出會通知誰、幾個人。 */
+export function getRecipientPreview(token, { audienceScope, groupBuyId } = {}) {
+  return apiRequest("/group-leader/announcements/recipient-preview", {
+    token,
+    params: { audience_scope: audienceScope, group_buy_id: groupBuyId || undefined },
+  });
+}
+
 export function createAnnouncement(payload, token) {
   return apiRequest("/group-leader/announcements", { method: "POST", body: payload, token });
 }

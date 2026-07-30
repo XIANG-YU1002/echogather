@@ -4,12 +4,17 @@ from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
 from app.models.announcement import Announcement
-from app.models.enums import AnnouncementAudienceScope, AnnouncementType, NotificationType
+from app.models.enums import (
+    UNMERGE_ALLOWED_STATUSES,
+    AnnouncementAudienceScope,
+    AnnouncementType,
+    NotificationType,
+)
 from app.models.group_leader import GroupLeaderProfile
 from app.models.notification import Notification
 from app.models.order import GroupOrder
 from app.models.user import AppUser
-from app.repositories import notification_repository
+from app.repositories import notification_repository, order_merge_repository
 from app.schemas.notification import (
     NotificationItem,
     NotificationSource,
@@ -19,15 +24,26 @@ from app.schemas.notification import (
 
 
 def notify_order_event(
-    db: Session, *, user_id: uuid.UUID, order_id: uuid.UUID, title: str, message: str
+    db: Session,
+    *,
+    user_id: uuid.UUID,
+    order_id: uuid.UUID,
+    title: str,
+    message: str,
+    unmerge_batch_id: uuid.UUID | None = None,
 ) -> Notification:
-    """建立系統通知（訂單狀態變更／取消申請結果），呼叫端需與相關狀態變更同一次 commit。"""
+    """建立系統通知（訂單狀態變更／取消申請結果），呼叫端需與相關狀態變更同一次 commit。
+
+    unmerge_batch_id 只有「訂單已合併」那一則會帶：圖 10 通知中心據此在該則通知底下
+    顯示「取消合併訂單」按鈕，不會讓同一張訂單的其他通知也長出按鈕。
+    """
     notification = Notification(
         user_id=user_id,
         notification_type=NotificationType.SYSTEM,
         title=title,
         message=message,
         order_id=order_id,
+        unmerge_batch_id=unmerge_batch_id,
     )
     db.add(notification)
     return notification
@@ -123,6 +139,28 @@ def _announcement_actor(db: Session, notification: Notification) -> tuple[str | 
     return profile.display_name, (user.avatar_url if user is not None else None)
 
 
+def _can_request_unmerge(db: Session, notification: Notification) -> bool:
+    """這則合併通知底下是否還能顯示「取消合併訂單」按鈕。
+
+    刻意不 import order_service（它會 import 本模組，形成循環），因此直接以
+    repository 判斷，條件與 order_service.get_unmergeable_batch_id 一致：
+    收件人必須是下單會員本人、訂單尚未出貨、該批次還沒被拆、且沒有待處理的申請。
+    """
+    batch_id = notification.unmerge_batch_id
+    if batch_id is None or notification.order_id is None:
+        return False
+    order = db.get(GroupOrder, notification.order_id)
+    if order is None or order.user_id != notification.user_id:
+        return False
+    if order.status not in UNMERGE_ALLOWED_STATUSES:
+        return False
+    if not order_merge_repository.get_batch(db, batch_id):
+        return False
+    if order_merge_repository.get_latest_active_batch_id(db, order.id) != batch_id:
+        return False
+    return order_merge_repository.get_pending_unmerge_request(db, order.id) is None
+
+
 def _to_item(db: Session, notification: Notification) -> NotificationItem:
     source, target_url = _source_and_target_url(db, notification)
     actor_name, actor_avatar_url = _announcement_actor(db, notification)
@@ -137,6 +175,8 @@ def _to_item(db: Session, notification: Notification) -> NotificationItem:
         target_url=target_url,
         actor_name=actor_name,
         actor_avatar_url=actor_avatar_url,
+        unmerge_batch_id=notification.unmerge_batch_id,
+        can_request_unmerge=_can_request_unmerge(db, notification),
         created_at=notification.created_at,
     )
 

@@ -5,15 +5,18 @@ import { useAuth } from "../../context/AuthContext.jsx";
 import { ApiError } from "../../api/client.js";
 import MediaImage from "../../components/common/MediaImage.jsx";
 import Breadcrumb from "../../components/common/Breadcrumb.jsx";
+import Button from "../../components/common/Button.jsx";
 import ErrorState from "../../components/common/ErrorState.jsx";
 import PageLoader from "../../components/common/PageLoader.jsx";
 import StatusBadge from "../../components/common/StatusBadge.jsx";
+import UnmergeRequestModal from "../../components/common/UnmergeRequestModal.jsx";
 import {
   ArrowLeftIcon,
   CalendarIcon,
   ClipboardIcon,
   DiscordIcon,
   FacebookIcon,
+  InfoIcon,
   LineIcon,
 } from "../../components/common/icons.jsx";
 import {
@@ -60,6 +63,7 @@ export default function OrderDetailPage() {
   const [order, setOrder] = useState(null);
   const [error, setError] = useState(null);
   const [copied, setCopied] = useState(false);
+  const [unmergeOpen, setUnmergeOpen] = useState(false);
 
   function load() {
     setError(null);
@@ -100,6 +104,11 @@ export default function OrderDetailPage() {
   const currentStep = currentStepIndex >= 0 ? TIMELINE_STEPS[currentStepIndex] : null;
   const canCancel =
     CANCELLABLE_STATUSES.includes(order.status) && !order.pending_cancellation_request;
+  // 合併而來的訂單才會有拆回的區塊。兩個區塊並存時才加小標題區分——
+  // 一般訂單只有一個區塊，卡片標題就足夠，多加小標題反而囉嗦（也才與圖 08 一致）。
+  const hasUnmergeSection = Boolean(
+    order.can_request_unmerge || order.pending_unmerge_request,
+  );
   const remaining = formatRemaining(order.deadline_at);
   const LeaderContactIcon = CONTACT_PLATFORM_ICONS[order.contact_platform];
 
@@ -149,7 +158,7 @@ export default function OrderDetailPage() {
 
             {isTerminalOther ? (
               <div className="info-note od-terminal">
-                <span aria-hidden="true">ⓘ</span>
+                <InfoIcon />
                 <span>
                   此訂單已{order.status === "rejected" ? "被團主拒絕" : "取消"}，不再繼續進行。
                   {order.status === "rejected" && order.rejection_reason
@@ -180,7 +189,7 @@ export default function OrderDetailPage() {
 
                 {currentStep && (
                   <div className="info-note od-hint">
-                    <span aria-hidden="true">ⓘ</span>
+                    <InfoIcon />
                     <span>{currentStep.hint}</span>
                   </div>
                 )}
@@ -246,7 +255,8 @@ export default function OrderDetailPage() {
                 </div>
               ))}
               <p className="oc-contact-hint">
-                ⓘ 此為下單當時的聯絡資料快照，後續修改個人資料不會影響本訂單。
+                <InfoIcon />
+                此為下單當時的聯絡資料快照，後續修改個人資料不會影響本訂單。
               </p>
             </div>
 
@@ -290,54 +300,115 @@ export default function OrderDetailPage() {
 
             <div className="gb-panel">
               <h2 className="section-title plain">取消申請</h2>
-              <p className="od-subtle-block">在以下狀態可申請取消訂單</p>
-              <div className="od-cancellable-chips">
-                {CANCELLABLE_STATUSES.map((status) => (
-                  <span className="char-tag" key={status}>
-                    {STATUS_LABELS[status]}
-                  </span>
-                ))}
-              </div>
 
-              {canCancel ? (
-                <Link className="btn btn-secondary btn-full od-cancel-btn" to={`/orders/${order.id}/cancel`}>
-                  申請取消訂單
-                </Link>
-              ) : null}
+              {/* 合併而來的訂單多出「拆回原訂單」區塊。與下方的「取消整筆訂單」
+                  併在同一張卡片內，兩欄區才不會變成 3 張而空一格（圖 08 是兩欄）。
+                  兩者容易混淆，因此文字刻意強調「商品保留，不是取消訂單」。
+                  入口除了這裡，通知中心那則「訂單已合併」通知底下也有一個。 */}
+              {hasUnmergeSection && (
+                <div className="od-cancel-group">
+                  <h3 className="od-cancel-subtitle">拆回原本的訂單</h3>
 
-              <p className="od-cancel-state">
-                ⓘ 目前狀態：
-                {order.pending_cancellation_request
-                  ? "已提出取消申請，等待團主處理"
-                  : canCancel
-                    ? "尚未提出取消申請"
-                    : "目前狀態無法申請取消訂單"}
-              </p>
-
-              <div className="info-note">
-                <span aria-hidden="true">ⓘ</span>
-                <span>提出申請後，請耐心等待團主處理。若團主拒絕，您可再次提出申請。</span>
-              </div>
-
-              {order.cancellation_requests.length > 0 && (
-                <div className="od-cancel-history">
-                  <p className="od-subtle-block">歷史取消申請</p>
-                  {order.cancellation_requests.map((request) => (
-                    <div className="od-cancel-entry" key={request.id}>
-                      <div className="od-cancel-entry-head">
-                        <StatusBadge domain="application" value={request.status} />
-                        <span className="od-subtle">{formatDateTime(request.created_at)}</span>
-                      </div>
-                      {request.reason && <p>原因：{request.reason}</p>}
-                      {request.response_note && <p>團主回覆：{request.response_note}</p>}
-                    </div>
-                  ))}
+                  {order.pending_unmerge_request ? (
+                    <>
+                      <p className="od-cancel-state">
+                        <InfoIcon />
+                        <span>
+                          已提出申請，等待團主處理。核准後會拆回合併前的
+                          {order.pending_unmerge_request.source_orders.length + 1} 張訂單。
+                        </span>
+                      </p>
+                      {order.pending_unmerge_request.reason && (
+                        <p className="od-subtle-block">
+                          你填寫的原因：{order.pending_unmerge_request.reason}
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <p className="od-subtle-block">
+                        這張訂單由多張合併而成。拆回後商品仍保留，
+                        <strong>不是取消訂單</strong>；各張會回到合併前的狀態與金額。
+                      </p>
+                      <Button
+                        variant="secondary"
+                        fullWidth
+                        className="od-cancel-btn"
+                        onClick={() => setUnmergeOpen(true)}
+                      >
+                        申請拆回原訂單
+                      </Button>
+                      <p className="od-cancel-state">
+                        <InfoIcon />
+                        <span>已出貨之後就無法再拆。</span>
+                      </p>
+                    </>
+                  )}
                 </div>
               )}
+
+              <div className="od-cancel-group">
+                {hasUnmergeSection && (
+                  <h3 className="od-cancel-subtitle">取消整筆訂單</h3>
+                )}
+                <p className="od-subtle-block">在以下狀態可申請取消訂單</p>
+                <div className="od-cancellable-chips">
+                  {CANCELLABLE_STATUSES.map((status) => (
+                    <span className="char-tag" key={status}>
+                      {STATUS_LABELS[status]}
+                    </span>
+                  ))}
+                </div>
+
+                {canCancel ? (
+                  <Link
+                    className="btn btn-secondary btn-full od-cancel-btn"
+                    to={`/orders/${order.id}/cancel`}
+                  >
+                    申請取消訂單
+                  </Link>
+                ) : null}
+
+                <p className="od-cancel-state">
+                  <InfoIcon />
+                  <span>
+                    目前狀態：
+                    {order.pending_cancellation_request
+                      ? "已提出取消申請，等待團主處理"
+                      : canCancel
+                        ? "尚未提出取消申請"
+                        : "目前狀態無法申請取消訂單"}
+                  </span>
+                </p>
+
+                <div className="info-note">
+                  <InfoIcon />
+                  <span>提出申請後，請耐心等待團主處理。若團主拒絕，您可再次提出申請。</span>
+                </div>
+
+                {order.cancellation_requests.length > 0 && (
+                  <div className="od-cancel-history">
+                    <p className="od-subtle-block">歷史取消申請</p>
+                    {order.cancellation_requests.map((request) => (
+                      <div className="od-cancel-entry" key={request.id}>
+                        <div className="od-cancel-entry-head">
+                          <StatusBadge domain="application" value={request.status} />
+                          <span className="od-subtle">{formatDateTime(request.created_at)}</span>
+                        </div>
+                        {request.reason && <p>原因：{request.reason}</p>}
+                        {request.response_note && <p>團主回覆：{request.response_note}</p>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
-          {/* 底部操作列 */}
+          {/* 底部操作列。參考圖 08 在這裡也畫了一顆「申請取消訂單」，但與
+              「取消申請」卡片內那顆完全重複（同一個路由、同樣文字），
+              使用者 2026-07-30 裁決移除這一顆——卡片內那顆旁邊才有可取消狀態、
+              目前狀態與「被拒絕可再申請」的說明脈絡。 */}
           <div className="od-actions">
             <Link className="btn btn-secondary" to="/orders">
               <ArrowLeftIcon />
@@ -347,11 +418,6 @@ export default function OrderDetailPage() {
               <Link className="btn btn-secondary" to={`/group-leaders/${order.group_leader_id}`}>
                 查看團主公開頁
               </Link>
-              {canCancel && (
-                <Link className="btn btn-primary" to={`/orders/${order.id}/cancel`}>
-                  申請取消訂單
-                </Link>
-              )}
             </div>
           </div>
         </div>
@@ -452,6 +518,14 @@ export default function OrderDetailPage() {
           </div>
         </aside>
       </div>
+
+      {unmergeOpen && (
+        <UnmergeRequestModal
+          orderId={order.id}
+          onClose={() => setUnmergeOpen(false)}
+          onSubmitted={load}
+        />
+      )}
     </>
   );
 }

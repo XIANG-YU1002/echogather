@@ -28,6 +28,9 @@ EXPECTED_TABLES = {
     # migration 0006_order_number_serial 新增：訂單編號每日流水計數器
     "order_number_counter",
     "cancellation_request",
+    # migration 0011_order_merge_and_unmerge 新增：訂單合併紀錄與拆單申請
+    "order_merge",
+    "order_unmerge_request",
     "product_favorite",
     "announcement",
     "notification",
@@ -38,9 +41,10 @@ EXPECTED_TABLES = {
 
 def test_all_tables_registered():
     """規格 18 張表，加上 0003 的 group_buy_product_character、0005 的
-    order_status_history 與 0006 的 order_number_counter，共 21 張。"""
+    order_status_history、0006 的 order_number_counter，以及 0011 的
+    order_merge 與 order_unmerge_request，共 25 張。"""
     assert set(Base.metadata.tables.keys()) == EXPECTED_TABLES
-    assert len(EXPECTED_TABLES) == 23
+    assert len(EXPECTED_TABLES) == 25
 
 
 def test_app_user_contact_columns_nullable_and_required_by_check_constraint():

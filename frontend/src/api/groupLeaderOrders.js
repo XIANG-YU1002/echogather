@@ -89,3 +89,21 @@ export function rejectCancellationRequest(requestId, responseNote, token) {
     token,
   });
 }
+
+/** 核准會員的取消合併申請：訂單拆回合併前的多張。 */
+export function approveUnmergeRequest(requestId, responseNote, token) {
+  return apiRequest(`/group-leader/unmerge-requests/${requestId}/approve`, {
+    method: "POST",
+    body: { response_note: responseNote || null },
+    token,
+  });
+}
+
+/** 拒絕取消合併申請（原因必填），訂單維持合併後的狀態。 */
+export function rejectUnmergeRequest(requestId, responseNote, token) {
+  return apiRequest(`/group-leader/unmerge-requests/${requestId}/reject`, {
+    method: "POST",
+    body: { response_note: responseNote || null },
+    token,
+  });
+}

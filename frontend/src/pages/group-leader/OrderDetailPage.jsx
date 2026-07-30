@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   acceptOrder,
   approveCancellationRequest,
+  approveUnmergeRequest,
   completeOrder,
   getGroupLeaderOrderDetail,
   getMergeableOrders,
@@ -11,6 +12,7 @@ import {
   mergeOrders,
   rejectCancellationRequest,
   rejectOrder,
+  rejectUnmergeRequest,
 } from "../../api/groupLeaderOrders.js";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { ApiError, resolveMediaUrl } from "../../api/client.js";
@@ -117,6 +119,8 @@ export default function OrderDetailPage() {
   const [error, setError] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
   const [cancellationNote, setCancellationNote] = useState("");
+  // 會員申請取消合併時，團主核准／拒絕的回覆備註（拒絕必填）
+  const [unmergeNote, setUnmergeNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState(null);
 
@@ -377,9 +381,7 @@ export default function OrderDetailPage() {
                         <td colSpan={3} className="od-total-label">
                           待收款
                         </td>
-                        <td className="od-total-value">
-                          NT$ {Number(order.product_total_amount) - Number(order.paid_amount)}
-                        </td>
+                        <td className="od-total-value">NT$ {order.outstanding_amount}</td>
                       </tr>
                     </>
                   )}
@@ -554,6 +556,76 @@ export default function OrderDetailPage() {
                   }
                 >
                   核准取消
+                </Button>
+              </div>
+            </section>
+          )}
+
+          {/* 會員申請取消合併（使用者 2026-07-30 需求）。核准後訂單會拆回合併前的
+              多張，各自恢復合併前的狀態與金額；拒絕必須填原因。 */}
+          {order.pending_unmerge_request && (
+            <section className="gbe-card">
+              <h2 className="gbe-card-title">取消合併申請</h2>
+              <p className="gbe-hint" style={{ marginTop: 0 }}>
+                會員希望把這張訂單拆回合併前的樣子。核准後下列訂單會重新出現，
+                本張訂單的金額與狀態會回到合併前。
+              </p>
+
+              {order.pending_unmerge_request.reason && (
+                <p className="od-cancel-reason">
+                  會員原因：{order.pending_unmerge_request.reason}
+                </p>
+              )}
+
+              <div className="od-unmerge-list">
+                {order.pending_unmerge_request.source_orders.map((source) => (
+                  <div key={source.order_number} className="od-unmerge-item">
+                    <span className="od-merge-number">{source.order_number}</span>
+                    <span className="od-unmerge-items">{source.item_summary}</span>
+                    <span className="od-unmerge-amount">
+                      NT$ {source.product_total_amount}
+                    </span>
+                    <StatusBadge domain="order" value={source.status_before} />
+                  </div>
+                ))}
+              </div>
+
+              <span className="gbe-label">回覆備註（拒絕時必填）</span>
+              <textarea
+                rows={3}
+                value={unmergeNote}
+                onChange={(event) => setUnmergeNote(event.target.value)}
+                placeholder="例如：已經一起收款，拆開會對不上帳"
+              />
+              <div className="od-cancel-actions">
+                <Button
+                  variant="secondary"
+                  loading={busy}
+                  onClick={() =>
+                    runAction(() =>
+                      rejectUnmergeRequest(
+                        order.pending_unmerge_request.id,
+                        unmergeNote,
+                        token,
+                      ),
+                    )
+                  }
+                >
+                  拒絕拆單
+                </Button>
+                <Button
+                  loading={busy}
+                  onClick={() =>
+                    runAction(() =>
+                      approveUnmergeRequest(
+                        order.pending_unmerge_request.id,
+                        unmergeNote,
+                        token,
+                      ),
+                    )
+                  }
+                >
+                  執行拆單
                 </Button>
               </div>
             </section>

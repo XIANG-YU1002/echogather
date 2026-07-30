@@ -32,3 +32,12 @@ export function createCancellationRequest(orderId, reason, token) {
     token,
   });
 }
+
+/** 申請取消合併（拆單）。團主核准後訂單才會拆回合併前的多張。 */
+export function createUnmergeRequest(orderId, reason, token) {
+  return apiRequest(`/orders/${orderId}/unmerge-requests`, {
+    method: "POST",
+    body: { reason: reason || null },
+    token,
+  });
+}

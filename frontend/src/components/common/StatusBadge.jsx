@@ -18,6 +18,9 @@ const STATUS_MAPS = {
     completed: { label: "已完成", tone: "success" },
     cancelled: { label: "已取消", tone: "neutral" },
     rejected: { label: "已拒絕", tone: "danger" },
+    // 被併進另一張訂單的來源訂單。前後台的列表與詳情都不顯示這種訂單，
+    // 這裡備著是為了狀態歷史等處不會露出原始英文值。
+    merged: { label: "已合併", tone: "neutral" },
   },
   application: {
     pending: { label: "待審核", tone: "warning" },

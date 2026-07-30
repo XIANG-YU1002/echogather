@@ -52,6 +52,35 @@ class CancellationRequestSummary(BaseModel):
     created_at: UTCDateTime
 
 
+class MergedSourceOrderSummary(BaseModel):
+    """被合併掉的來源訂單摘要。
+
+    這些訂單在畫面上等同已刪除（使用者 2026-07-30 裁決），但拆單申請與團主的
+    拆單確認都需要說明「哪幾筆被併進來、各有什麼商品」，所以以摘要形式回傳。
+    """
+
+    order_number: str
+    status_before: OrderStatus
+    item_summary: str
+    product_total_amount: Money
+    created_at: UTCDateTime
+
+
+class UnmergeRequestSummary(BaseModel):
+    """會員提出的拆單（取消合併）申請。"""
+
+    id: uuid.UUID
+    order_id: uuid.UUID
+    batch_id: uuid.UUID
+    reason: str | None
+    status: CancellationStatus
+    response_note: str | None
+    processed_at: UTCDateTime | None
+    created_at: UTCDateTime
+    # 這次申請要拆回的來源訂單，讓團主核准前看得到會拆出什麼
+    source_orders: list[MergedSourceOrderSummary] = []
+
+
 class OrderStatusHistoryItem(BaseModel):
     """訂單狀態異動紀錄（圖 08 右側「狀態紀錄」）。"""
 
@@ -86,9 +115,18 @@ class OrderDetailResponse(BaseModel):
     status_history: list[OrderStatusHistoryItem] = []
     pending_cancellation_request: CancellationRequestSummary | None
     cancellation_requests: list[CancellationRequestSummary]
+    # 這張訂單是由多張合併而來、且目前還能拆回時為 true（圖 10 通知按鈕與訂單詳情共用判斷）
+    can_request_unmerge: bool = False
+    pending_unmerge_request: UnmergeRequestSummary | None = None
     created_at: UTCDateTime
     updated_at: UTCDateTime
 
 
 class CreateCancellationRequestRequest(BaseModel):
+    reason: str | None = None
+
+
+class CreateUnmergeRequestRequest(BaseModel):
+    """會員提出取消合併（拆單）申請。原因選填。"""
+
     reason: str | None = None

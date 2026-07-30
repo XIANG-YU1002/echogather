@@ -56,9 +56,28 @@ class AnnouncementOwnerResponse(BaseModel):
     id: uuid.UUID
     audience_scope: AnnouncementAudienceScope
     group_buy_id: uuid.UUID | None
+    # 圖 27「目標與對象」欄要顯示指定開團是哪一個活動的第幾團。
+    # 不靠前端用開團清單對照——那份清單只載入 50 筆，超出或舊開團就查不到名稱。
+    group_buy_activity_name: str | None = None
+    group_buy_round_number: int | None = None
     title: str
     content: str
     is_public: bool
     recipient_count: int
     published_at: UTCDateTime
     updated_at: UTCDateTime
+
+
+class RecipientPreviewResponse(BaseModel):
+    """圖 27 表單的「通知對象預覽」：發布前先算出會通知誰、幾個人。
+
+    公告建立後才有 recipient_count（通知筆數），發布前只能即時計算，
+    因此沿用建立公告時的同一組收件人查詢，確保預覽與實際發送一致。
+    """
+
+    audience_scope: AnnouncementAudienceScope
+    group_buy_id: uuid.UUID | None = None
+    group_buy_activity_name: str | None = None
+    recipient_count: int
+    # 給畫面直接顯示的對象描述，例如「3.4 官方周邊未完成訂單會員」
+    audience_label: str

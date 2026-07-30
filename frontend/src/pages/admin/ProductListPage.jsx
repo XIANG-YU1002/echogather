@@ -13,12 +13,17 @@ import { SearchIcon } from "../../components/common/icons.jsx";
 
 export default function ProductListPage() {
   const { token } = useAuth();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [activities, setActivities] = useState([]);
-  const [activityId, setActivityId] = useState(searchParams.get("activity_id") ?? "");
-  const [isActive, setIsActive] = useState(searchParams.get("is_active") ?? "");
-  const [keyword, setKeyword] = useState("");
-  const [keywordInput, setKeywordInput] = useState("");
+  // 篩選條件以網址為單一來源（docs/03 §23a）：原本 activity_id／is_active 只取初始值、
+  // keyword 放元件狀態，點側邊選單回到 /admin/products（無 query）時篩選會殘留，
+  // 得離開頁面或 F5 才清得掉。活動管理頁的「查看商品」也是靠 activity_id 帶進來的。
+  const activityId = searchParams.get("activity_id") ?? "";
+  const isActive = searchParams.get("is_active") ?? "";
+  const keyword = searchParams.get("keyword") ?? "";
+
+  // 搜尋框的未送出輸入值；keyword 才是實際條件
+  const [keywordInput, setKeywordInput] = useState(keyword);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(5);
   const [products, setProducts] = useState(null);
@@ -52,10 +57,32 @@ export default function ProductListPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activityId, isActive, keyword, page, pageSize]);
 
+  // 網址的關鍵字被外部改掉時（點選單清空、瀏覽器上一頁），搜尋框要跟著更新
+  useEffect(() => {
+    setKeywordInput(keyword);
+  }, [keyword]);
+
+  // 網址上的篩選一改就回第一頁，否則可能停在超出範圍的頁碼而顯示空清單
+  useEffect(() => {
+    setPage(1);
+  }, [activityId, isActive, keyword]);
+
+  /** 更新網址上的篩選參數；值為空即移除該參數。 */
+  function updateParams(changes) {
+    const params = new URLSearchParams(searchParams);
+    Object.entries(changes).forEach(([key, value]) => {
+      if (value) {
+        params.set(key, value);
+      } else {
+        params.delete(key);
+      }
+    });
+    setSearchParams(params, { replace: true });
+  }
+
   function handleSearchSubmit(event) {
     event.preventDefault();
-    setPage(1);
-    setKeyword(keywordInput.trim());
+    updateParams({ keyword: keywordInput.trim() });
   }
 
   async function handleToggleActive(product) {
@@ -88,10 +115,7 @@ export default function ProductListPage() {
           <button
             type="button"
             className="btn btn-secondary"
-            onClick={() => {
-              setActivityId("");
-              setPage(1);
-            }}
+            onClick={() => updateParams({ activity_id: "" })}
           >
             顯示全部商品
           </button>
@@ -114,10 +138,7 @@ export default function ProductListPage() {
         <select
           className="admin-toolbar-select"
           value={activityId}
-          onChange={(event) => {
-            setActivityId(event.target.value);
-            setPage(1);
-          }}
+          onChange={(event) => updateParams({ activity_id: event.target.value })}
           aria-label="選擇活動"
         >
           <option value="">全部活動</option>
@@ -130,10 +151,7 @@ export default function ProductListPage() {
         <select
           className="admin-toolbar-select"
           value={isActive}
-          onChange={(event) => {
-            setIsActive(event.target.value);
-            setPage(1);
-          }}
+          onChange={(event) => updateParams({ is_active: event.target.value })}
           aria-label="狀態篩選"
         >
           <option value="">全部狀態</option>

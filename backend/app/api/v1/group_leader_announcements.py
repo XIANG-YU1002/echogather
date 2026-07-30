@@ -36,6 +36,23 @@ def get_my_announcements(
     )
 
 
+@router.get("/recipient-preview")
+def preview_recipients(
+    audience_scope: AnnouncementAudienceScope = Query(...),
+    group_buy_id: uuid.UUID | None = Query(None),
+    profile: GroupLeaderProfile = Depends(get_current_active_group_leader_profile),
+    db: Session = Depends(get_db),
+) -> dict:
+    """圖 27 表單的通知對象預覽：發布前先算出會通知誰、幾個人。
+
+    路由必須放在 /{announcement_id} 之前，否則 recipient-preview 會被當成 UUID 解析。
+    """
+    result = service.preview_recipients(
+        db, profile, audience_scope=audience_scope, group_buy_id=group_buy_id
+    )
+    return envelope(result.model_dump(mode="json"))
+
+
 @router.post("", status_code=status.HTTP_201_CREATED)
 def create_announcement(
     payload: CreateAnnouncementRequest,

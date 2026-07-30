@@ -15,10 +15,12 @@ import ErrorState from "../../components/common/ErrorState.jsx";
 import MediaImage from "../../components/common/MediaImage.jsx";
 import PageLoader from "../../components/common/PageLoader.jsx";
 import Pagination from "../../components/common/Pagination.jsx";
+import UnmergeRequestModal from "../../components/common/UnmergeRequestModal.jsx";
 import {
   BellIcon,
   ChevronRightIcon,
   ClipboardIcon,
+  InfoIcon,
   MegaphoneIcon,
 } from "../../components/common/icons.jsx";
 
@@ -38,6 +40,9 @@ const READ_FILTERS = [
 ];
 
 const PAGE_SIZE = 10;
+
+// 與 NotificationContext 的未讀數輪詢間隔一致
+const POLL_INTERVAL_MS = 30000;
 
 /** 相對時間；超過兩天改顯示日期時間。 */
 function formatRelativeTime(isoString) {
@@ -66,6 +71,9 @@ export default function NotificationsPage() {
   const [summary, setSummary] = useState(null);
   const [error, setError] = useState(false);
   const [markingAll, setMarkingAll] = useState(false);
+  // 「訂單已合併」通知底下的取消合併申請（使用者 2026-07-30 需求）。
+  // 存整則通知，因為要用 source.id 取得對應的訂單。
+  const [unmergeTarget, setUnmergeTarget] = useState(null);
 
   function loadSummary() {
     getNotificationSummary(token)
@@ -73,9 +81,15 @@ export default function NotificationsPage() {
       .catch(() => setSummary(null));
   }
 
-  function load() {
+  /**
+   * silent：自動刷新時不清空列表、不跳 loading，否則每 30 秒整頁會閃一次。
+   * 同購物車數量調整時採用的靜默刷新做法。
+   */
+  function load({ silent = false } = {}) {
     setError(false);
-    setItems(null);
+    if (!silent) {
+      setItems(null);
+    }
     getNotifications(token, {
       notificationType: type,
       isRead: readFilter,
@@ -86,7 +100,12 @@ export default function NotificationsPage() {
         setItems(response.data);
         setPagination(response.pagination);
       })
-      .catch(() => setError(true));
+      .catch(() => {
+        // 自動刷新失敗時保留現有內容，不要把整頁換成錯誤畫面
+        if (!silent) {
+          setError(true);
+        }
+      });
   }
 
   useEffect(() => {
@@ -98,6 +117,33 @@ export default function NotificationsPage() {
     loadSummary();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
+
+  // 停在通知頁時也要看得到新通知（原本只在進頁面時載入一次，得手動 F5）。
+  // 與 NotificationContext 的未讀數同一套機制：定時輪詢 ＋ 切回分頁時立即刷新。
+  useEffect(() => {
+    if (!token) return undefined;
+
+    function refreshSilently() {
+      load({ silent: true });
+      loadSummary();
+    }
+    const timer = setInterval(refreshSilently, POLL_INTERVAL_MS);
+
+    function handleVisibilityChange() {
+      if (document.visibilityState === "visible") {
+        refreshSilently();
+      }
+    }
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("focus", refreshSilently);
+
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("focus", refreshSilently);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, type, readFilter, page]);
 
   async function handleItemClick(notification) {
     if (notification.is_read) return;
@@ -282,6 +328,21 @@ export default function NotificationsPage() {
                             {body}
                           </button>
                         )}
+                        {/* 取消合併按鈕必須放在可點擊的通知本體外面，否則會變成
+                            巢狀互動元素，而且點按鈕就會被當成點通知而導頁 */}
+                        {notification.can_request_unmerge && (
+                          <div className="nc-item-actions">
+                            <Button
+                              variant="secondary"
+                              onClick={() => openUnmergeModal(notification)}
+                            >
+                              取消合併訂單
+                            </Button>
+                            <span className="nc-item-actions-hint">
+                              需由團主確認後才會拆回原本的訂單
+                            </span>
+                          </div>
+                        )}
                       </li>
                     );
                   })}
@@ -317,7 +378,7 @@ export default function NotificationsPage() {
 
           <div className="gb-panel">
             <h2 className="fl-sum-title nc-tip-title">
-              <span aria-hidden="true">ⓘ</span>
+              <InfoIcon />
               小提醒
             </h2>
             <p className="nc-tip-body">
@@ -326,6 +387,16 @@ export default function NotificationsPage() {
           </div>
         </aside>
       </div>
+
+      {unmergeTarget && (
+        <UnmergeRequestModal
+          orderId={unmergeTarget.source.id}
+          onClose={() => setUnmergeTarget(null)}
+          // 送出後重新載入：後端在有待處理申請時會把 can_request_unmerge 轉為 false，
+          // 按鈕因此消失
+          onSubmitted={load}
+        />
+      )}
     </>
   );
 }

@@ -2968,7 +2968,118 @@ CANCELLATION_NOT_ALLOWED
 
 ---
 
+# 24.10 Merge Orders
+
+> 新增紀錄（2026-07-29 需求；2026-07-30 調整來源訂單狀態與新增拆單）。
+
+```http
+GET  /api/v1/group-leader/orders/{order_id}/mergeable
+POST /api/v1/group-leader/orders/{order_id}/merge
+```
+
+`mergeable` 回傳可與此訂單合併的其他訂單：同開團、同會員、狀態為
+待確認／待付款／已付款、且無待處理取消申請。訂單本身不可合併時回空陣列，
+前端據此不顯示合併區塊。
+
+`merge` 的 Request：
+
+```json
+{ "merge_with_order_ids": ["<uuid>"], "keep": "oldest" }
+```
+
+`keep` 為 `oldest`／`newest`，決定保留哪一張的訂單編號與 `created_at`
+（會影響先喊先得的排隊順位，故由團主選擇而非系統決定）。
+
+行為：
+
+1. 同商品**同角色**的明細數量相加；不同角色維持獨立列
+   （`order_item` 的唯一鍵是 order + product + character）。
+2. 來源訂單的明細**複製**到目標訂單，來源保留自己的明細（拆單要靠它們）。
+3. 來源訂單狀態改為 `merged`，會員端與團主端一律不再顯示（詳情回 404）。
+4. 合併後狀態：全部已付款時維持 `paid`，否則為 `pending_payment`
+   （團主願意合併即代表已確認）。已付款部分記入 `paid_amount`，
+   與待收金額（`outstanding_amount`）分開顯示。
+5. 合併前的狀態與金額寫入 `order_merge`，供拆單還原。
+6. 通知會員：含哪幾張併到哪一張、被併掉訂單的商品明細、應付金額與聯絡團主提示，
+   並帶 `unmerge_batch_id` 供通知中心顯示「取消合併訂單」按鈕。
+
+Errors：
+
+```text
+ORDER_MERGE_DIFFERENT_GROUP_BUY
+ORDER_MERGE_DIFFERENT_MEMBER
+ORDER_MERGE_STATUS_NOT_ALLOWED
+ORDER_MERGE_HAS_PENDING_CANCELLATION
+```
+
+---
+
+# 24.11 Unmerge (Cancel Merge) Requests
+
+> 新增紀錄（2026-07-30 使用者需求）。
+
+會員提出、團主核准或拒絕。會員的入口在通知中心「訂單已合併」那一則底下。
+
+```http
+POST /api/v1/orders/{order_id}/unmerge-requests
+POST /api/v1/group-leader/unmerge-requests/{request_id}/approve
+POST /api/v1/group-leader/unmerge-requests/{request_id}/reject
+```
+
+會員申請（`reason` 選填）成立條件：
+
+- 訂單是本人的，且狀態為待確認／待付款／已付款（`shipped` 之後不可拆）
+- 該訂單有尚未拆開的合併批次
+- 沒有其他待處理的拆單申請
+
+核准後的還原（`approve`）：
+
+1. 目標訂單的明細扣掉各來源訂單當初併進來的數量，扣到 0 的那筆刪除
+   （那是合併時新建的）。
+2. 目標訂單的狀態、商品總額、已收金額改回 `order_merge` 的合併前快照。
+3. 各來源訂單改回自己合併前的狀態與已收金額，重新出現在兩端。
+4. 合併紀錄填入 `unmerged_at` 保留為歷史。
+5. 通知會員拆單完成。
+
+拒絕（`reject`）：`response_note` **必填**，訂單維持合併後的狀態，
+會員可再次申請，並收到含團主說明的通知。
+
+二次合併只能從**最新**批次往回拆（先拆舊批次會把新批次併進來的數量一起扣掉）。
+
+Errors：
+
+```text
+ORDER_NOT_FOUND
+ORDER_NOT_MERGED
+UNMERGE_NOT_ALLOWED
+UNMERGE_REQUEST_ALREADY_PENDING
+UNMERGE_REQUEST_NOT_FOUND
+UNMERGE_REQUEST_ALREADY_PROCESSED
+UNMERGE_NOT_LATEST_BATCH
+ORDER_MERGE_ALREADY_UNMERGED
+```
+
+回應欄位（`UnmergeRequestSummary`）：
+
+| Field | Type | Description |
+|---|---|---|
+| id | UUID | 申請 ID |
+| order_id | UUID | 合併後保留的訂單 |
+| batch_id | UUID | 要拆回的合併批次 |
+| reason | string \| null | 會員填寫的原因 |
+| status | CancellationStatus | pending／approved／rejected |
+| response_note | string \| null | 團主回覆（拒絕時必填） |
+| source_orders | array | 會拆回的訂單：編號、合併前狀態、商品明細、金額 |
+
+---
+
 # 25. Group Leader Announcement API
+
+> 修訂紀錄（2026-07-30，圖 27 改版）：
+> - `AnnouncementOwnerResponse` 新增 `group_buy_activity_name` 與 `group_buy_round_number`
+>   （圖 27「目標與對象」欄要顯示指定開團是哪一個活動的第幾團。不靠前端用開團清單
+>   對照——那份清單只載入 50 筆，超出或舊開團就查不到名稱）。
+> - 新增 §25.6 通知對象預覽。
 
 # 25.1 Get My Announcements
 
@@ -3067,6 +3178,48 @@ DELETE /api/v1/group-leader/announcements/{announcement_id}
 Success：`204 No Content`。
 
 刪除公告時一併刪除該公告產生的通知，不影響其他通知。
+
+---
+
+# 25.6 Preview Announcement Recipients
+
+> 新增紀錄（2026-07-30，圖 27 的「通知對象預覽」）。
+
+```http
+GET /api/v1/group-leader/announcements/recipient-preview
+    ?audience_scope=leader_unfinished|group_buy_unfinished
+    &group_buy_id=<uuid>
+```
+
+發布前先算出這則公告會通知誰、幾個人。公告建立後才有 `recipient_count`（通知筆數），
+發布前只能即時計算，因此本端點**沿用 §25.2 建立公告時的同一組收件人查詢**，
+確保預覽與實際發送一致。
+
+`audience_scope=group_buy_unfinished` 時 `group_buy_id` 必填。
+
+Response：
+
+| Field | Type | Description |
+|---|---|---|
+| audience_scope | AnnouncementAudienceScope | 公告類型 |
+| group_buy_id | UUID \| null | 指定開團（整體公告為 null） |
+| group_buy_activity_name | string \| null | 指定開團的活動名稱 |
+| recipient_count | int | 即時計算的收件人數 |
+| audience_label | string | 給畫面直接顯示的對象描述，例如「3.4 官方周邊未完成訂單會員」 |
+
+Errors：
+
+```text
+VALIDATION_ERROR          # 特定開團公告未帶 group_buy_id（422）
+GROUP_BUY_NOT_FOUND       # 開團不存在（404）
+GROUP_BUY_NOT_OWNED       # 開團不屬於此團主（404）
+```
+
+實作注意：路由必須註冊在 `/{announcement_id}` **之前**，
+否則 `recipient-preview` 會被當成 UUID 解析而回 422。
+
+收件人數為 0 時仍可預覽（畫面提示「必須設為公開才能發布」，
+實際限制在 §25.2 的 `ANNOUNCEMENT_NO_RECIPIENTS`）。
 
 ---
 
@@ -3779,9 +3932,20 @@ JWT 必須驗證簽章與到期時間，使用安全 Secret，且不得在 Respo
 後端不得允許：
 
 - 修改已完成拒絕的 `rejection_reason`
-- 合併兩張已建立訂單
+- 系統自動合併訂單：會員每次送單一律建立獨立訂單，不得併入先前訂單
 - 改寫訂單 `created_at` 以改變先喊順序
 - 以目前團主名稱覆蓋歷史訂單快照
+
+> 修訂紀錄（2026-07-30）：原文為「合併兩張已建立訂單」，與使用者 2026-07-29
+> 新增的**團主手動合併**功能矛盾，已改寫為禁止「系統自動合併」。
+> 團主合併是明確的人工操作，且不破壞不可變歷史：
+>
+> - 來源訂單的明細與金額完整保留，只改狀態為 `merged`
+> - 合併前的狀態與金額快照存入 `order_merge`，會員可申請拆回（見 §24.6）
+> - 兩張訂單的 `created_at` 都不改寫；保留哪一張的編號與時間由團主選擇
+>
+> 仍然禁止的是「會員送單時系統自動併入舊訂單」——那會破壞先喊先得的排隊順位
+> （見 §18、§24.1）。
 
 ## 35.8 File Upload
 
@@ -4035,6 +4199,7 @@ POST   /orders
 GET    /orders
 GET    /orders/{order_id}
 POST   /orders/{order_id}/cancellation-requests
+POST   /orders/{order_id}/unmerge-requests
 GET    /notifications
 GET    /notifications/unread-count
 GET    /notifications/summary
@@ -4077,9 +4242,14 @@ POST   /group-leader/orders/{order_id}/reject
 POST   /group-leader/orders/{order_id}/mark-paid
 POST   /group-leader/orders/{order_id}/mark-shipped
 POST   /group-leader/orders/{order_id}/complete
+GET    /group-leader/orders/{order_id}/mergeable
+POST   /group-leader/orders/{order_id}/merge
 POST   /group-leader/cancellation-requests/{request_id}/approve
 POST   /group-leader/cancellation-requests/{request_id}/reject
+POST   /group-leader/unmerge-requests/{request_id}/approve
+POST   /group-leader/unmerge-requests/{request_id}/reject
 GET    /group-leader/announcements
+GET    /group-leader/announcements/recipient-preview
 POST   /group-leader/announcements
 GET    /group-leader/announcements/{announcement_id}
 PATCH  /group-leader/announcements/{announcement_id}

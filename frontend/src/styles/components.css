@@ -519,8 +519,16 @@ input[type="checkbox"] {
   font-size: 0.85rem;
   color: var(--color-text-muted);
 }
+/* 與團主後台的 .gbl-page-size select 同一種外觀（邊框＋圓角＋白底），
+   否則這裡會是瀏覽器原生下拉，跟站內其他下拉明顯不同。 */
 .page-size-select select {
   width: auto;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background-color: var(--color-surface);
+  color: var(--color-text);
+  font-size: 0.85rem;
 }
 
 /* Platform announcement page (依 35_) */

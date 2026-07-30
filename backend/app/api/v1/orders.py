@@ -7,7 +7,11 @@ from app.api.deps import PaginationParams, get_current_user, get_db
 from app.core.responses import envelope, paginated_envelope
 from app.models.enums import OrderStatus
 from app.models.user import AppUser
-from app.schemas.order import CreateCancellationRequestRequest, CreateOrderRequest
+from app.schemas.order import (
+    CreateCancellationRequestRequest,
+    CreateOrderRequest,
+    CreateUnmergeRequestRequest,
+)
 from app.services import cancellation_service, order_service
 
 router = APIRouter(prefix="/orders", tags=["orders"])
@@ -68,4 +72,16 @@ def create_cancellation_request(
     result = cancellation_service.create_cancellation_request(
         db, current_user, order_id, payload.reason
     )
+    return envelope(result.model_dump(mode="json"))
+
+
+@router.post("/{order_id}/unmerge-requests", status_code=status.HTTP_201_CREATED)
+def create_unmerge_request(
+    order_id: uuid.UUID,
+    payload: CreateUnmergeRequestRequest,
+    current_user: AppUser = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    """提出取消合併（拆單）申請，由團主核准後才真正拆回原本的多張訂單。"""
+    result = order_service.request_unmerge(db, current_user, order_id, payload.reason)
     return envelope(result.model_dump(mode="json"))

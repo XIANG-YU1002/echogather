@@ -1,8 +1,10 @@
 """訂單合併（使用者 2026-07-29 需求）。
 
 規則：同會員同開團、狀態限待確認／待付款／已付款、保留哪張由團主選、
-同商品同角色數量相加、合併後狀態取進度最慢者、已付款部分記入 paid_amount、
-被併入的訂單標記為已取消。
+同商品同角色數量相加、合併後狀態取進度最慢者、已付款部分記入 paid_amount。
+被併入的訂單標記為 merged（使用者 2026-07-30 由 cancelled 改為專屬狀態），
+前後台都不再顯示，資料保留供拆單還原——拆單本身的測試見
+test_order_unmerge_api.py。
 """
 
 from datetime import datetime, timedelta, timezone
@@ -11,7 +13,7 @@ from decimal import Decimal
 import pytest
 
 from app.models.enums import CancellationStatus, OrderStatus
-from app.models.order import CancellationRequest, OrderItem
+from app.models.order import CancellationRequest, GroupOrder, OrderItem
 from tests.factories import (
     create_activity,
     create_character,
@@ -89,12 +91,15 @@ def test_merge_two_pending_orders_sums_same_product(client, db_session):
     # 合併代表團主已確認這些訂單，待確認直接進到待付款
     assert data["status"] == "pending_payment"
 
-    # 被併入的訂單標記為已取消
+    # 被併入的訂單改標記為 merged，且團主端也不再看得到它（使用者 2026-07-30 裁決）
     db_session.expire_all()
-    detail = client.get(
-        f"/api/v1/group-leader/orders/{newer.id}", headers=ctx["headers"]
-    ).json()["data"]
-    assert detail["status"] == "cancelled"
+    assert db_session.get(GroupOrder, newer.id).status == OrderStatus.MERGED
+    assert (
+        client.get(
+            f"/api/v1/group-leader/orders/{newer.id}", headers=ctx["headers"]
+        ).status_code
+        == 404
+    )
 
 
 def test_merge_keep_newest_uses_newest_order_number(client, db_session):
@@ -376,8 +381,9 @@ def test_merge_rejects_non_mergeable_statuses(client, db_session, blocked_status
 def test_merged_source_order_keeps_its_own_items(client, db_session):
     """被併入的訂單要保留自己的明細作為歷史。
 
-    若直接把明細搬到目標訂單，來源訂單會變成沒有商品的空殼，
-    訂單列表就會顯示「共 0 件商品」。來源已是 cancelled，不會重複佔用庫存。
+    若直接把明細搬到目標訂單，來源訂單會變成沒有商品的空殼，拆單時也就無從還原。
+    來源是 merged，不佔用庫存，所以不會重複計算。
+    改為 merged 後前後台都看不到它了（使用者 2026-07-30 裁決），因此明細要直接查 DB。
     """
     ctx = _setup(db_session, client)
     target = create_order_with_item(
@@ -407,24 +413,30 @@ def test_merged_source_order_keeps_its_own_items(client, db_session):
     assert merged.status_code == 200, merged.text
     assert merged.json()["data"]["items"][0]["quantity"] == 5
 
-    source_detail = client.get(
-        f"/api/v1/group-leader/orders/{source.id}", headers=ctx["headers"]
-    ).json()["data"]
-    assert source_detail["status"] == "cancelled"
-    # 來源訂單仍看得到自己原本訂的內容與金額
-    assert len(source_detail["items"]) == 1
-    assert source_detail["items"][0]["quantity"] == 3
-    assert Decimal(source_detail["product_total_amount"]) == Decimal("300.00")
+    # 來源訂單在資料庫仍保有自己原本訂的內容與金額（拆單還原要靠這些明細）
+    db_session.expire_all()
+    source_row = db_session.get(GroupOrder, source.id)
+    assert source_row.status == OrderStatus.MERGED
+    source_items = (
+        db_session.query(OrderItem).filter(OrderItem.order_id == source.id).all()
+    )
+    assert len(source_items) == 1
+    assert source_items[0].quantity == 3
+    assert Decimal(source_row.product_total_amount) == Decimal("300.00")
 
-    # 列表的商品摘要不會變成「共 0 件」
+    # 但團主端的詳情與列表都不再出現它
+    assert (
+        client.get(
+            f"/api/v1/group-leader/orders/{source.id}", headers=ctx["headers"]
+        ).status_code
+        == 404
+    )
     listed = client.get(
         "/api/v1/group-leader/orders",
         params={"page": 1, "page_size": 50},
         headers=ctx["headers"],
     ).json()["data"]
-    source_row = next(row for row in listed if row["id"] == str(source.id))
-    assert source_row["total_quantity"] == 3
-    assert source_row["item_summary"]
+    assert all(row["id"] != str(source.id) for row in listed)
 
 
 @pytest.mark.parametrize(

@@ -18,6 +18,7 @@ import {
   ClipboardIcon,
   CreditCardIcon,
   GiftIcon,
+  InfoIcon,
   RefreshIcon,
   TagIcon,
   UsersIcon,
@@ -89,7 +90,7 @@ function AddToFollowListPanel({ product, groupBuy }) {
     return (
       <div className="gb-panel">
         <div className="info-note">
-          <span aria-hidden="true">ⓘ</span>
+          <InfoIcon />
           這是你自己的開團，無法對自己下單。請至團主後台管理此開團與訂單。
         </div>
       </div>

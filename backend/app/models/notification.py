@@ -38,6 +38,11 @@ class Notification(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
         ForeignKey("group_leader_application.id", ondelete="RESTRICT"),
         nullable=True,
     )
+    # 這則通知對應哪一次訂單合併（order_merge.batch_id）。有值時圖 10 的通知中心
+    # 會在該則通知底下顯示「取消合併訂單」按鈕；不是外鍵，因為批次拆掉後紀錄仍留著。
+    unmerge_batch_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), nullable=True
+    )
     is_read: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
     read_at: Mapped[object | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
@@ -55,5 +60,9 @@ class Notification(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
             (is_read = true AND read_at IS NOT NULL)
             """,
             name="ck_notification_read_state_pair",
+        ),
+        CheckConstraint(
+            "unmerge_batch_id IS NULL OR order_id IS NOT NULL",
+            name="ck_notification_unmerge_batch_requires_order",
         ),
     )

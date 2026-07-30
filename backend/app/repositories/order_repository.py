@@ -12,7 +12,13 @@ from app.models.user import AppUser
 
 # 不佔用庫存、也不計入團主端統計的訂單狀態。開團統計（訂單數／訂購數量）沿用同一基準，
 # 依使用者 2026-07-29 裁決：已取消與已拒絕的訂單不算進統計。
-NON_OCCUPYING_STATUSES = ("cancelled", "rejected")
+# merged（被併進另一張訂單的來源訂單）也必須在此：合併時明細是複製到目標訂單，
+# 來源訂單保留自己的明細作為歷史，若它仍佔用庫存，同一筆訂購量就會被算兩次。
+NON_OCCUPYING_STATUSES = ("cancelled", "rejected", "merged")
+
+# 會員端與團主端一律看不到的訂單狀態（使用者 2026-07-30 裁決：合併後來源訂單
+# 從畫面上消失，等同刪除，但資料庫完整保留以供拆單還原）。
+HIDDEN_ORDER_STATUSES = ("merged",)
 
 
 def get_occupied_quantity(
@@ -124,7 +130,11 @@ def list_by_user(
     created_within_days: int | None = None,
 ) -> tuple[list[GroupOrder], int]:
     """依圖 07 篩選卡：狀態、時間範圍、活動名稱、團主名稱（後兩者為不分大小寫的部分比對）。"""
-    stmt = select(GroupOrder).where(GroupOrder.user_id == user_id)
+    stmt = select(GroupOrder).where(
+        GroupOrder.user_id == user_id,
+        # 被合併掉的訂單在畫面上等同已刪除，任何狀態篩選都不該出現
+        GroupOrder.status.notin_(HIDDEN_ORDER_STATUSES),
+    )
     if status is not None:
         stmt = stmt.where(GroupOrder.status == status)
     if activity_name:
@@ -231,11 +241,18 @@ def _leader_orders_stmt(
     activity_id: uuid.UUID | None,
     keyword: str | None,
 ):
-    """團主訂單的共用篩選（不含狀態），列表與統計卡共用同一組條件。"""
+    """團主訂單的共用篩選（不含狀態），列表與統計卡共用同一組條件。
+
+    被合併掉的來源訂單（merged）在這裡就排除，列表、六張統計卡與待處理取消申請
+    計數因此一致看不到它們——若分頭排除，總有一處會漏掉而讓它露出來。
+    """
     stmt = (
         select(GroupOrder)
         .join(GroupBuy, GroupBuy.id == GroupOrder.group_buy_id)
-        .where(GroupBuy.group_leader_profile_id == group_leader_profile_id)
+        .where(
+            GroupBuy.group_leader_profile_id == group_leader_profile_id,
+            GroupOrder.status.notin_(HIDDEN_ORDER_STATUSES),
+        )
     )
     if group_buy_id is not None:
         stmt = stmt.where(GroupOrder.group_buy_id == group_buy_id)

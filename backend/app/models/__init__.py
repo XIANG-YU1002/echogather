@@ -10,8 +10,10 @@ from app.models.order import (
     CancellationRequest,
     GroupOrder,
     OrderItem,
+    OrderMerge,
     OrderNumberCounter,
     OrderStatusHistory,
+    OrderUnmergeRequest,
 )
 from app.models.password_reset import PasswordResetToken
 from app.models.product import Character, Product, ProductCharacter, ProductImage
@@ -36,6 +38,8 @@ __all__ = [
     "OrderItem",
     "OrderNumberCounter",
     "OrderStatusHistory",
+    "OrderMerge",
+    "OrderUnmergeRequest",
     "CancellationRequest",
     "ProductFavorite",
     "Announcement",

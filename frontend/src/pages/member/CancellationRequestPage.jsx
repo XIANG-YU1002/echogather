@@ -11,7 +11,12 @@ import ErrorState from "../../components/common/ErrorState.jsx";
 import MediaImage from "../../components/common/MediaImage.jsx";
 import PageLoader from "../../components/common/PageLoader.jsx";
 import StatusBadge from "../../components/common/StatusBadge.jsx";
-import { ArrowLeftIcon, CalendarIcon, ClipboardIcon } from "../../components/common/icons.jsx";
+import {
+  ArrowLeftIcon,
+  CalendarIcon,
+  ClipboardIcon,
+  InfoIcon,
+} from "../../components/common/icons.jsx";
 import {
   CANCELLABLE_STATUSES,
   STATUS_LABELS,
@@ -193,7 +198,7 @@ export default function CancellationRequestPage() {
             <div className="gb-panel">
               <h2 className="section-title plain">無法申請取消</h2>
               <div className="info-note cr-ineligible">
-                <span aria-hidden="true">ⓘ</span>
+                <InfoIcon />
                 <span>{ineligibleReason}</span>
               </div>
               {hasPendingRequest && !statusNotAllowed && (
@@ -236,7 +241,7 @@ export default function CancellationRequestPage() {
             </div>
 
             <div className="info-note purple cr-notice">
-              <span aria-hidden="true">ⓘ</span>
+              <InfoIcon />
               <div>
                 <p className="cr-notice-title">注意事項</p>
                 <ul>

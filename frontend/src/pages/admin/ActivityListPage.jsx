@@ -22,10 +22,14 @@ function formatDateTime(isoString) {
 
 export default function ActivityListPage() {
   const { token } = useAuth();
-  const [searchParams] = useSearchParams();
-  const [status, setStatus] = useState(searchParams.get("status") ?? "");
-  const [keyword, setKeyword] = useState("");
-  const [keywordInput, setKeywordInput] = useState("");
+  const [searchParams, setSearchParams] = useSearchParams();
+  // 篩選條件以網址為單一來源（docs/03 §23a）：原本 status 只取初始值、keyword 放元件狀態，
+  // 點側邊選單回到 /admin/activities（無 query）時篩選會殘留，得離開頁面或 F5 才清得掉。
+  const status = searchParams.get("status") ?? "";
+  const keyword = searchParams.get("keyword") ?? "";
+
+  // 搜尋框的未送出輸入值；keyword 才是實際條件
+  const [keywordInput, setKeywordInput] = useState(keyword);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(5);
   const [activities, setActivities] = useState(null);
@@ -50,10 +54,32 @@ export default function ActivityListPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, keyword, page, pageSize]);
 
+  // 網址的關鍵字被外部改掉時（點選單清空、瀏覽器上一頁），搜尋框要跟著更新
+  useEffect(() => {
+    setKeywordInput(keyword);
+  }, [keyword]);
+
+  // 網址上的篩選一改就回第一頁，否則可能停在超出範圍的頁碼而顯示空清單
+  useEffect(() => {
+    setPage(1);
+  }, [status, keyword]);
+
+  /** 更新網址上的篩選參數；值為空即移除該參數。 */
+  function updateParams(changes) {
+    const params = new URLSearchParams(searchParams);
+    Object.entries(changes).forEach(([key, value]) => {
+      if (value) {
+        params.set(key, value);
+      } else {
+        params.delete(key);
+      }
+    });
+    setSearchParams(params, { replace: true });
+  }
+
   function handleSearchSubmit(event) {
     event.preventDefault();
-    setPage(1);
-    setKeyword(keywordInput.trim());
+    updateParams({ keyword: keywordInput.trim() });
   }
 
   async function handleEnd() {
@@ -99,10 +125,7 @@ export default function ActivityListPage() {
         <select
           className="admin-toolbar-select"
           value={status}
-          onChange={(event) => {
-            setStatus(event.target.value);
-            setPage(1);
-          }}
+          onChange={(event) => updateParams({ status: event.target.value })}
           aria-label="狀態篩選"
         >
           <option value="">全部狀態</option>

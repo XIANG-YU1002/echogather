@@ -1483,6 +1483,17 @@
 }
 
 /* Info note boxes */
+/* 提示區塊的資訊圖示：原本用 ⓘ 文字字元，改為 SVG 後需固定尺寸並避免被壓縮
+   （文字字元會被選取複製，大小顏色也無法與其他 icon 統一）。 */
+.info-note > svg,
+.oc-contact-hint > svg,
+.od-cancel-state > svg {
+  width: 0.95rem;
+  height: 0.95rem;
+  flex-shrink: 0;
+  margin-top: 0.15rem;
+}
+
 .info-note {
   display: flex;
   align-items: flex-start;
@@ -1748,7 +1759,10 @@
 /* Member self-service layout */
 .member-layout {
   display: grid;
-  grid-template-columns: 220px 1fr;
+  /* 必須是 minmax(0, 1fr) 而不是 1fr：grid item 的 1fr 隱含 min-width: auto，
+     內容（例如 white-space: nowrap 的表格）一寬就會把這一欄撐大並溢出版面，
+     此時對內容區設 padding／寬度都不會生效。min 設 0 才讓這一欄真正可收縮。 */
+  grid-template-columns: 220px minmax(0, 1fr);
   gap: 2rem;
   align-items: start;
   padding: 2rem 0;
@@ -2122,10 +2136,40 @@
   color: var(--color-text-muted);
   line-height: 1.6;
   overflow-wrap: anywhere;
+  /* 合併通知會逐行列出被併掉的訂單與商品，需要保留訊息裡的換行 */
+  white-space: pre-line;
 }
 
 .nc-item-actor {
   font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+
+/* 「訂單已合併」通知底下的取消合併入口。放在通知本體外面（見 NotificationsPage
+   的註解），所以自己補左側縮排對齊訊息文字。 */
+.nc-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding: 0 1.25rem 1rem calc(1.25rem + 2.5rem + 0.9rem);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.nc-item-actions .btn {
+  padding: 0.35rem 0.85rem;
+  font-size: 0.82rem;
+}
+
+.nc-item-actions-hint {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+
+.nc-unmerge-note {
+  margin: 0 0 1rem;
+  font-size: 0.88rem;
+  line-height: 1.7;
   color: var(--color-text-muted);
 }
 
@@ -2617,11 +2661,30 @@
   margin-bottom: 1rem;
 }
 
+/* 「取消申請」卡片內的兩個動作：拆回原訂單／取消整筆訂單。
+   併在同一張卡片是為了讓兩欄區維持兩張卡（圖 08 的版面），
+   但兩者意思完全不同，所以用小標題與分隔線明確切開，避免誤按。
+   只有一個區塊時（一般訂單）不顯示小標題，畫面與圖 08 完全相同。 */
+.od-cancel-group + .od-cancel-group {
+  margin-top: 1.1rem;
+  padding-top: 1.1rem;
+  border-top: 1px dashed var(--color-border);
+}
+
+.od-cancel-subtitle {
+  margin: 0 0 0.6rem;
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
 .od-cancel-btn {
   margin-bottom: 0.75rem;
 }
 
 .od-cancel-state {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
   margin: 0 0 0.9rem;
   font-size: 0.8rem;
   color: var(--color-text-muted);
@@ -3101,6 +3164,9 @@
 }
 
 .oc-contact-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
   margin: 0.35rem 0 0;
   font-size: 0.8rem;
   color: var(--color-text-muted);
@@ -7768,6 +7834,39 @@ a.glp-activity:hover {
   color: var(--color-success);
 }
 
+/* 取消合併申請：核准後會拆回的訂單清單（唯讀，不像合併候選那樣可勾選） */
+.od-unmerge-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 0.75rem 0 1rem;
+}
+
+.od-unmerge-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background-color: var(--color-bg);
+}
+
+.od-unmerge-items {
+  flex: 1 1 12rem;
+  min-width: 0;
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.od-unmerge-amount {
+  font-weight: 700;
+  font-size: 0.88rem;
+  white-space: nowrap;
+}
+
 /* 訂單合併：可合併的候選清單 */
 .od-merge-list {
   display: flex;
@@ -7864,6 +7963,639 @@ a.glp-activity:hover {
 
 .ann-filter-bar strong {
   margin: 0 0.3rem;
+}
+
+/* ===== 圖 28 團主資料管理 ===== */
+
+/* 左寬右窄兩欄；右欄的預設團規卡在窄視窗改為堆疊在下方 */
+.glp-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(300px, 1fr);
+  gap: 1.25rem;
+  align-items: start;
+}
+
+@media (max-width: 1023px) {
+  .glp-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.glp-card {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: 0 1px 3px rgb(15 23 42 / 6%);
+  padding: 1.5rem;
+}
+
+/* 基本資料卡內部再分兩欄：左頭像區、右名稱與自我介紹 */
+.glp-basic {
+  display: grid;
+  grid-template-columns: minmax(200px, 260px) minmax(0, 1fr);
+  gap: 1.5rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+@media (max-width: 767px) {
+  .glp-basic {
+    grid-template-columns: 1fr;
+  }
+}
+
+.glp-avatar-col {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.glp-avatar-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.9rem;
+  text-align: center;
+}
+
+.glp-avatar {
+  width: 8rem;
+  height: 8rem;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid #e0e7ff;
+}
+
+.glp-avatar-fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--color-bg);
+  color: var(--color-text-muted);
+  font-size: 2.5rem;
+  font-weight: 700;
+}
+
+.glp-avatar-box .btn svg {
+  width: 1.05rem;
+  height: 1.05rem;
+}
+
+.glp-avatar-hint {
+  margin: 0;
+  font-size: 0.78rem;
+  line-height: 1.6;
+  color: var(--color-text-muted);
+}
+
+/* 公開資料狀態卡：已啟用綠底、未啟用紅底（使用者 2026-07-30 裁決） */
+.glp-status {
+  display: flex;
+  gap: 0.7rem;
+  align-items: flex-start;
+  padding: 0.85rem 0.95rem;
+  border-radius: var(--radius);
+  font-size: 0.82rem;
+}
+
+.glp-status.is-ok {
+  background-color: #ecfdf5;
+  border: 1px solid #a7f3d0;
+}
+
+.glp-status.is-warn {
+  background-color: #fef2f2;
+  border: 1px solid #fecaca;
+}
+
+.glp-status-icon {
+  flex-shrink: 0;
+  display: inline-flex;
+  margin-top: 0.1rem;
+}
+
+.glp-status-icon svg {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.glp-status.is-ok .glp-status-icon {
+  color: var(--color-success);
+}
+
+.glp-status.is-warn .glp-status-icon {
+  color: var(--color-danger);
+}
+
+.glp-status-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  line-height: 1.6;
+}
+
+.glp-status.is-ok strong {
+  color: #047857;
+}
+
+.glp-status.is-warn strong {
+  color: #b91c1c;
+}
+
+.glp-fields-col {
+  display: flex;
+  flex-direction: column;
+}
+
+/* 已設定的公開名稱：灰底唯讀＋右側鎖頭 */
+.glp-locked-input {
+  position: relative;
+  display: block;
+}
+
+.glp-locked-input input:disabled {
+  background-color: var(--color-bg);
+  padding-right: 2.5rem;
+}
+
+.glp-lock-icon {
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  color: var(--color-text-muted);
+  pointer-events: none;
+}
+
+.glp-lock-icon svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+/* 右下角字數統計（自我介紹與預設團規共用） */
+.glp-counted-field {
+  position: relative;
+}
+
+.glp-char-count {
+  position: absolute;
+  right: 0.6rem;
+  bottom: 0.55rem;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  pointer-events: none;
+}
+
+.glp-contacts {
+  padding-top: 1.25rem;
+}
+
+.glp-section-sub {
+  margin-left: 0.4rem;
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: var(--color-text-muted);
+}
+
+/* 每列＝品牌標籤（灰底）＋輸入框＋清除鈕，三者連成一體 */
+.glp-contact-row {
+  display: flex;
+  align-items: stretch;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin-bottom: 0.6rem;
+  background-color: var(--color-surface);
+}
+
+.glp-contact-row:focus-within {
+  border-color: var(--color-primary);
+}
+
+.glp-contact-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-shrink: 0;
+  width: 9.5rem;
+  padding: 0 0.85rem;
+  background-color: var(--color-bg);
+  border-right: 1px solid var(--color-border);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.glp-contact-label svg {
+  width: 1.15rem;
+  height: 1.15rem;
+  flex-shrink: 0;
+}
+
+/* 輸入框本身不要邊框圓角，才能與左右兩塊連成一列 */
+.glp-contact-row input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  border-radius: 0;
+  padding: 0.7rem 0.85rem;
+  font-size: 0.88rem;
+}
+
+.glp-contact-row input:focus {
+  outline: none;
+  box-shadow: none;
+}
+
+.glp-contact-clear {
+  flex-shrink: 0;
+  width: 2.5rem;
+  border: none;
+  background: none;
+  color: var(--color-text-muted);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.glp-contact-clear:hover:not(:disabled) {
+  color: var(--color-danger);
+}
+
+.glp-contact-clear:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.glp-contact-hint {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0.75rem 0 0;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.glp-contact-hint svg {
+  width: 0.95rem;
+  height: 0.95rem;
+  flex-shrink: 0;
+}
+
+/* 一項都沒填時提醒轉紅：這是能不能開團的必要條件 */
+.glp-contact-hint.is-warn {
+  color: var(--color-danger);
+}
+
+.glp-rules-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.glp-rules-field {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+.glp-rules-field textarea {
+  min-height: 22rem;
+}
+
+/* 右欄：預設團規與儲存卡上下堆疊，儲存卡因此緊貼在團規卡下方
+   （若讓它自己去佔 grid 第二列，會被推到最高那張卡的底線之下而顯得脫節） */
+.glp-side-col {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.glp-save-card {
+  padding: 1.1rem 1.25rem;
+}
+
+.glp-save-note {
+  margin: 0 0 0.75rem;
+  font-size: 0.8rem;
+  line-height: 1.6;
+  color: var(--color-text-muted);
+}
+
+.glp-save-btn svg {
+  width: 1.05rem;
+  height: 1.05rem;
+}
+
+/* ===== 圖 27 團主公告管理 ===== */
+
+.ann-header {
+  margin-bottom: 0.9rem;
+}
+
+/* 依圖 27，新增按鈕自成一列在副標下方、左對齊 */
+.ann-actions {
+  margin-bottom: 1.25rem;
+}
+
+.ann-actions .btn svg {
+  width: 1.05rem;
+  height: 1.05rem;
+}
+
+/* 表單抽屜（使用者 2026-07-30 要求：右側整欄跳出、頂端在 header 下，
+   **且頁面內容要向左收窄、不可被遮擋**）。
+   抽屜本身是 fixed 貼齊視窗右緣才有「整欄」的樣子；為了不遮擋內容，
+   開啟時由 body class 讓後台內容區收窄（見 .ann-drawer-open）。
+   註：只給 .ann-layout 加 padding 是不夠的——.container 有 max-width 且居中，
+   內容區的右半部仍會落在貼齊視窗右緣的抽屜底下。 */
+.ann-layout {
+  --ann-drawer-width: 400px;
+}
+
+.ann-panel,
+.ann-form-panel {
+  background-color: #fff;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: 0 1px 3px rgb(15 23 42 / 6%);
+}
+
+/* 卡片本身不留內距，改把內距給在儲存格上：
+   否則灰底表頭與卡片邊框之間會露出一條白邊，看起來像「卡片包卡片」。
+   overflow: hidden 讓表頭灰底被卡片圓角裁切，才能貼齊頂部。 */
+.ann-panel {
+  padding: 0;
+  overflow: hidden;
+}
+
+/* .table-wrap 自帶邊框圓角，在卡片內會變成第二層框（同 .admin-panel 的處理） */
+.ann-panel .table-wrap {
+  border: none;
+  border-radius: 0;
+}
+
+/* .table 預設 white-space: nowrap，表格因此無法隨卡片縮小，只會長出水平滾動條。
+   這裡改回可折行，抽屜開啟時文字與卡片才會一起縮小（使用者 2026-07-30 要求）。 */
+.ann-table th,
+.ann-table td {
+  padding: 1rem 1.5rem;
+  vertical-align: middle;
+  white-space: normal;
+}
+
+.ann-table td:first-child {
+  max-width: 20rem;
+}
+
+/* 只有這兩者不折行：日期時間拆行會很難讀，操作按鈕折行會變形 */
+.ann-time,
+.ann-row-actions {
+  white-space: nowrap;
+}
+
+/* 分頁列的文字同樣不能貼齊卡片邊緣 */
+.ann-panel .list-footer {
+  padding: 0.9rem 1.5rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.ann-title {
+  display: block;
+  font-weight: 700;
+  font-size: 0.92rem;
+  overflow-wrap: anywhere;
+}
+
+/* 參考圖沒有內容欄，改以標題下方一行摘要呈現（使用者 2026-07-30 裁決） */
+.ann-excerpt {
+  display: block;
+  margin-top: 0.2rem;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 「目標與對象」欄：一列標籤＋值，特定開團公告會有兩組 */
+.ann-target-block {
+  display: block;
+  font-size: 0.82rem;
+}
+
+.ann-target-block + .ann-target-block {
+  margin-top: 0.5rem;
+}
+
+.ann-target-label {
+  display: block;
+  color: var(--color-text-muted);
+  font-size: 0.76rem;
+}
+
+.ann-target-value {
+  display: block;
+}
+
+.ann-time {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+/* 操作欄：依圖 27 上下排列的外框小按鈕 */
+.ann-row-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  align-items: stretch;
+}
+
+.ann-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  padding: 0.35rem 0.7rem;
+  border-radius: var(--radius);
+  background-color: #fff;
+  font-size: 0.82rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.ann-action-btn svg {
+  width: 0.95rem;
+  height: 0.95rem;
+}
+
+.ann-action-btn.edit {
+  border: 1px solid var(--color-primary);
+  color: var(--color-primary);
+}
+
+.ann-action-btn.edit:hover {
+  background-color: #f3f0ff;
+}
+
+.ann-action-btn.delete {
+  border: 1px solid var(--color-danger);
+  color: var(--color-danger);
+}
+
+.ann-action-btn.delete:hover {
+  background-color: #fef2f2;
+}
+
+/* 抽屜本體：貼齊視窗右緣、由 header 底部延伸到視窗底部（整欄的樣子），
+   內容過長時自身滾動。--ann-drawer-top 由頁面量測 .app-header 實際高度寫入
+   （header 是 sticky 且高度由內容決定，沒有固定值可寫死）。
+   z-index 低於 header 的 100，才不會蓋住 header。 */
+.ann-form-panel {
+  position: fixed;
+  top: var(--ann-drawer-top, 5rem);
+  right: 0;
+  bottom: 0;
+  width: min(var(--ann-drawer-width), 100vw);
+  z-index: 90;
+  padding: 1.25rem;
+  overflow-y: auto;
+  border-radius: 0;
+  border-top: none;
+  border-right: none;
+  border-bottom: none;
+  box-shadow: -8px 0 24px rgb(15 23 42 / 12%);
+}
+
+/* 抽屜開啟時內容區要向左收窄，讓表格（含最右邊的操作欄）完整可見。
+   收窄量由頁面以 JS 量測「內容區右緣與抽屜左緣的實際重疊」後寫成 inline style
+   ——不用 CSS calc 推算：.container 有 max-width 且居中、後台還有側邊欄，
+   純 CSS 算出來的值與實際重疊量對不上，量測才可靠。 */
+.member-content {
+  transition: padding-right 0.18s ease;
+}
+
+@media (max-width: 1023px) {
+  /* 窄視窗：抽屜改為整頁寬 */
+  .ann-form-panel {
+    width: 100vw;
+  }
+}
+
+.ann-form-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.ann-form-head h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.ann-radio {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-bottom: 0.4rem;
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+
+.ann-radio input {
+  margin: 0;
+  flex-shrink: 0;
+}
+
+/* 內容框右下角的字數統計（依圖 27 的 0 / 1000） */
+.ann-content-field {
+  position: relative;
+}
+
+.ann-char-count {
+  position: absolute;
+  right: 0.6rem;
+  bottom: 0.55rem;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  pointer-events: none;
+}
+
+.ann-preview {
+  background-color: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 0.9rem 1rem;
+  margin-bottom: 1rem;
+}
+
+.ann-preview-title {
+  margin: 0 0 0.7rem;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.ann-preview-body {
+  display: flex;
+  gap: 0.75rem;
+  align-items: flex-start;
+}
+
+.ann-preview-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.4rem;
+  height: 2.4rem;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background-color: #e0e7ff;
+  color: var(--color-primary);
+}
+
+.ann-preview-icon svg {
+  width: 1.2rem;
+  height: 1.2rem;
+}
+
+.ann-preview-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+  font-size: 0.85rem;
+}
+
+.ann-preview-label {
+  color: var(--color-text-muted);
+}
+
+.ann-preview-value {
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.ann-preview-note {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+
+.ann-preview-empty {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+}
+
+.ann-form-actions {
+  display: flex;
+  gap: 0.6rem;
+}
+
+.ann-form-actions .btn {
+  flex: 1;
 }
 
 @media (max-width: 1023px) {

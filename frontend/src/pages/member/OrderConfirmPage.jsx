@@ -17,6 +17,7 @@ import {
   ClipboardIcon,
   DiscordIcon,
   FacebookIcon,
+  InfoIcon,
   LineIcon,
   PencilIcon,
 } from "../../components/common/icons.jsx";
@@ -228,7 +229,7 @@ export default function OrderConfirmPage() {
             </div>
 
             <div className="info-note" style={{ marginTop: "1.25rem" }}>
-              <span aria-hidden="true">ⓘ</span>
+              <InfoIcon />
               <span>
                 如需修改數量，請返回 <Link to="/follow-list">購物車</Link>。
               </span>
@@ -308,7 +309,7 @@ export default function OrderConfirmPage() {
               <span className="fl-total-value">NT${followList.estimated_product_total}</span>
             </div>
             <div className="info-note purple">
-              <span aria-hidden="true">ⓘ</span>
+              <InfoIcon />
               <span>
                 商品總額僅包含商品單價 × 數量，不包含二補、國際運費、國內運費或其他後續費用。
               </span>

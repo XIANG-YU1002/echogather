@@ -4,10 +4,21 @@ from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError
-from app.models.enums import CancellationStatus, GroupLeaderOrderStatusFilter, OrderStatus
+from app.models.enums import (
+    UNMERGE_ALLOWED_STATUSES,
+    CancellationStatus,
+    GroupLeaderOrderStatusFilter,
+    OrderStatus,
+)
 from app.models.group_leader import GroupLeaderProfile
-from app.models.order import CancellationRequest, GroupOrder
-from app.repositories import cancellation_repository, group_buy_repository, order_repository, user_repository
+from app.models.order import CancellationRequest, GroupOrder, OrderUnmergeRequest
+from app.repositories import (
+    cancellation_repository,
+    group_buy_repository,
+    order_merge_repository,
+    order_repository,
+    user_repository,
+)
 from app.schemas.common import normalize_optional_text
 from app.schemas.group_leader_order import (
     GroupLeaderOrderDetailResponse,
@@ -16,8 +27,13 @@ from app.schemas.group_leader_order import (
     MemberContactSnapshot,
     MergeOrdersRequest,
 )
-from app.schemas.order import CancellationRequestSummary, OrderItemDetail
-from app.services import notification_service
+from app.schemas.order import (
+    CancellationRequestSummary,
+    MergedSourceOrderSummary,
+    OrderItemDetail,
+    UnmergeRequestSummary,
+)
+from app.services import notification_service, order_service
 from app.services.order_service import build_item_summary
 
 _CANCELLABLE_STATUSES = {
@@ -37,8 +53,16 @@ _AVAILABLE_ACTIONS_BY_STATUS = {
 def _load_owned_order(
     db: Session, profile: GroupLeaderProfile, order_id: uuid.UUID, *, for_update: bool = False
 ) -> GroupOrder:
+    """載入自己開團底下的訂單。
+
+    被合併掉的來源訂單（merged）依使用者 2026-07-30 裁決在團主端也視為已刪除，
+    因此一律回 404，避免它從詳情頁或任何狀態操作的網址被翻出來。
+    拆單還原要讀來源訂單，走的是 order_repository.get_by_id（不經過這裡）。
+    """
     order = order_repository.get_by_id(db, order_id, for_update=for_update)
     if order is None:
+        raise AppError(404, "ORDER_NOT_FOUND", "找不到指定的訂單。")
+    if order.status == OrderStatus.MERGED:
         raise AppError(404, "ORDER_NOT_FOUND", "找不到指定的訂單。")
     group_buy = group_buy_repository.get_by_id(db, order.group_buy_id)
     if group_buy.group_leader_profile_id != profile.id:
@@ -158,6 +182,10 @@ def get_order_detail(
     pending = next(
         (r for r in cancellation_requests if r.status == CancellationStatus.PENDING), None
     )
+    unmerge_requests = order_merge_repository.list_unmerge_requests_by_order(db, order.id)
+    pending_unmerge = next(
+        (r for r in unmerge_requests if r.status == CancellationStatus.PENDING), None
+    )
     # 收單期限讀開團的即時值，團主延期後詳情頁要跟著更新
     group_buy = group_buy_repository.get_by_id(db, order.group_buy_id)
 
@@ -168,6 +196,7 @@ def get_order_detail(
         rejection_reason=order.rejection_reason,
         product_total_amount=order.product_total_amount,
         paid_amount=order.paid_amount,
+        outstanding_amount=order.product_total_amount - order.paid_amount,
         member_nickname=member.nickname if member is not None else "",
         member_avatar_url=member.avatar_url if member is not None else None,
         member_contacts=MemberContactSnapshot(
@@ -202,6 +231,14 @@ def get_order_detail(
             _cancellation_to_summary(pending) if pending is not None else None
         ),
         cancellation_requests=[_cancellation_to_summary(r) for r in cancellation_requests],
+        pending_unmerge_request=(
+            order_service.build_unmerge_summary(db, pending_unmerge)
+            if pending_unmerge is not None
+            else None
+        ),
+        unmerge_requests=[
+            order_service.build_unmerge_summary(db, r) for r in unmerge_requests
+        ],
         available_actions=_AVAILABLE_ACTIONS_BY_STATUS.get(order.status, []),
         created_at=order.created_at,
         updated_at=order.updated_at,
@@ -285,7 +322,9 @@ def merge_orders(
     - 同商品同角色的明細數量相加（order_item 有 (order,product,character) 唯一約束）。
     - 合併後狀態取進度最慢者：含待確認就是待確認。
     - 已付款訂單併入時，那部分的錢已收，記入 paid_amount 與待收金額分開顯示。
-    - 被併入的訂單標記為已取消，並在狀態歷史註明併入哪一張。
+    - 被併入的訂單標記為 merged（使用者 2026-07-30 改為專屬狀態，不再寫成已取消），
+      前後台都不再顯示，但資料完整保留；同時寫入 order_merge 紀錄合併前的狀態與金額，
+      供會員申請拆單、團主核准後還原。
     """
     if not payload.merge_with_order_ids:
         raise AppError(422, "VALIDATION_ERROR", "請選擇要合併的訂單。")
@@ -366,6 +405,20 @@ def merge_orders(
                 )
     db.flush()
 
+    # 拆單要能還原成合併前各自的狀態，所以在改動任何欄位「之前」先把快照留下來
+    batch_id = uuid.uuid4()
+    target_status_before = target.status
+    target_product_total_before = target.product_total_amount
+    target_paid_amount_before = target.paid_amount
+    source_states_before = {source.id: (source.status, source.paid_amount) for source in sources}
+    # 通知要列出被併掉的訂單各自有哪些商品（使用者 2026-07-30 需求），
+    # 而來源明細在下面不會被改動，但先取出來語意較清楚
+    source_item_lines = [
+        f"{source.order_number}："
+        f"{order_service.describe_items(order_repository.get_items(db, source.id))}"
+        for source in sources
+    ]
+
     merged_items = order_repository.get_items(db, target.id)
     target.product_total_amount = sum(item.subtotal for item in merged_items)
     target.paid_amount = paid_amount
@@ -376,12 +429,24 @@ def merge_orders(
     target.status = OrderStatus.PAID if all_paid else OrderStatus.PENDING_PAYMENT
 
     for source in sources:
-        source.status = OrderStatus.CANCELLED
+        status_before, paid_before = source_states_before[source.id]
+        source.status = OrderStatus.MERGED
         order_repository.create_status_history(
             db,
             source.id,
-            OrderStatus.CANCELLED,
+            OrderStatus.MERGED,
             note=f"已合併至訂單 {target.order_number}",
+        )
+        order_merge_repository.create_merge_record(
+            db,
+            batch_id=batch_id,
+            target_order_id=target.id,
+            source_order_id=source.id,
+            source_status_before=status_before,
+            source_paid_amount_before=paid_before,
+            target_status_before=target_status_before,
+            target_product_total_before=target_product_total_before,
+            target_paid_amount_before=target_paid_amount_before,
         )
 
     order_repository.create_status_history(
@@ -399,6 +464,9 @@ def merge_orders(
     else:
         payment_note = f"合併後應付金額為 NT${outstanding}。"
 
+    # 通知內容依使用者 2026-07-30 需求：說明哪幾筆併到哪一筆、被併掉的訂單各有什麼商品、
+    # 有問題請聯絡團主。unmerge_batch_id 讓圖 10 通知中心在這一則底下顯示
+    # 「取消合併訂單」按鈕（其他通知不會有）。
     notification_service.notify_order_event(
         db,
         user_id=target.user_id,
@@ -406,12 +474,158 @@ def merge_orders(
         title="訂單已合併",
         message=(
             f"團主已將你的訂單 {'、'.join(s.order_number for s in sources)} "
-            f"合併至 {target.order_number}，請以合併後的訂單為準。{payment_note}"
+            f"合併至 {target.order_number}，原本的訂單不再顯示，請以合併後的訂單為準。\n"
+            f"被合併的訂單內容：\n"
+            + "\n".join(source_item_lines)
+            + f"\n{payment_note}\n"
+            "如對合併內容有疑問請聯絡團主；若要恢復成原本的多張訂單，"
+            "可在此通知下方提出取消合併申請，由團主為你拆回。"
         ),
+        unmerge_batch_id=batch_id,
     )
 
     db.commit()
     return get_order_detail(db, profile, target.id)
+
+
+def _load_owned_unmerge_request(
+    db: Session, profile: GroupLeaderProfile, request_id: uuid.UUID
+) -> tuple[OrderUnmergeRequest, GroupOrder]:
+    request = order_merge_repository.get_unmerge_request_by_id(db, request_id, for_update=True)
+    if request is None:
+        raise AppError(404, "UNMERGE_REQUEST_NOT_FOUND", "找不到指定的取消合併申請。")
+    order = _load_owned_order(db, profile, request.order_id, for_update=True)
+    return request, order
+
+
+def approve_unmerge(
+    db: Session, profile: GroupLeaderProfile, request_id: uuid.UUID, response_note: str | None
+) -> UnmergeRequestSummary:
+    """核准會員的拆單申請：把訂單還原成合併前的多張（使用者 2026-07-30 裁決）。
+
+    還原方式：
+    - 目標訂單的明細扣掉各來源訂單當初併進來的數量，扣到 0 的那筆是合併時新建的，直接刪除。
+    - 目標訂單的狀態與金額改回 order_merge 存下的合併前快照。
+    - 各來源訂單改回自己合併前的狀態與已收金額，重新出現在會員端與團主端。
+
+    只能拆最新一批：二次合併後先拆舊批次會把新批次併進來的數量一起扣掉。
+    """
+    request, target = _load_owned_unmerge_request(db, profile, request_id)
+    if request.status != CancellationStatus.PENDING:
+        raise AppError(409, "UNMERGE_REQUEST_ALREADY_PROCESSED", "此取消合併申請已被處理。")
+    if target.status not in UNMERGE_ALLOWED_STATUSES:
+        raise AppError(
+            409,
+            "UNMERGE_NOT_ALLOWED",
+            "訂單目前狀態已無法拆單。",
+            {"status": target.status.value},
+        )
+
+    records = order_merge_repository.get_batch(db, request.batch_id, for_update=True)
+    if not records:
+        raise AppError(409, "ORDER_MERGE_ALREADY_UNMERGED", "這批合併已經拆開過了。")
+    if order_merge_repository.get_latest_active_batch_id(db, target.id) != request.batch_id:
+        raise AppError(
+            409,
+            "UNMERGE_NOT_LATEST_BATCH",
+            "這張訂單之後又合併過，請先拆開最近一次的合併。",
+        )
+
+    now = datetime.now(timezone.utc)
+    target_items = {
+        (item.group_buy_product_id, item.chosen_character_id): item
+        for item in order_repository.get_items(db, target.id)
+    }
+
+    restored_numbers = []
+    for record in records:
+        source = order_repository.get_by_id(db, record.source_order_id, for_update=True)
+        if source is None:
+            continue
+        for item in order_repository.get_items(db, source.id):
+            key = (item.group_buy_product_id, item.chosen_character_id)
+            existing = target_items.get(key)
+            if existing is None:
+                continue
+            existing.quantity -= item.quantity
+            if existing.quantity <= 0:
+                # 合併時才新建的那筆，拆回後目標訂單本來就不該有
+                db.delete(existing)
+                target_items.pop(key, None)
+            else:
+                existing.subtotal = existing.unit_price * existing.quantity
+        source.status = record.source_status_before
+        source.paid_amount = record.source_paid_amount_before
+        order_repository.create_status_history(
+            db,
+            source.id,
+            record.source_status_before,
+            note=f"已從訂單 {target.order_number} 拆回",
+        )
+        restored_numbers.append(source.order_number)
+
+    # 同一批次的 target_*_before 每列都相同，取第一列即可
+    snapshot = records[0]
+    target.product_total_amount = snapshot.target_product_total_before
+    target.paid_amount = snapshot.target_paid_amount_before
+    target.status = snapshot.target_status_before
+    order_merge_repository.mark_batch_unmerged(db, records, now)
+    order_repository.create_status_history(
+        db,
+        target.id,
+        target.status,
+        note="已拆回 " + "、".join(restored_numbers),
+    )
+
+    request.status = CancellationStatus.APPROVED
+    request.response_note = normalize_optional_text(response_note)
+    request.processed_at = now
+
+    notification_service.notify_order_event(
+        db,
+        user_id=target.user_id,
+        order_id=target.id,
+        title="取消合併申請已核准",
+        message=(
+            f"團主已將訂單 {target.order_number} 拆回合併前的狀態，"
+            f"{'、'.join(restored_numbers)} 已恢復顯示，請分別確認各張訂單的狀態與金額。"
+            + (f"\n團主備註：{request.response_note}" if request.response_note else "")
+        ),
+    )
+    db.commit()
+    db.refresh(request)
+    return order_service.build_unmerge_summary(db, request)
+
+
+def reject_unmerge(
+    db: Session, profile: GroupLeaderProfile, request_id: uuid.UUID, response_note: str | None
+) -> UnmergeRequestSummary:
+    """拒絕拆單申請：訂單維持合併後的狀態，會員可再次提出（同取消申請的做法）。"""
+    request, target = _load_owned_unmerge_request(db, profile, request_id)
+    if request.status != CancellationStatus.PENDING:
+        raise AppError(409, "UNMERGE_REQUEST_ALREADY_PROCESSED", "此取消合併申請已被處理。")
+
+    note = normalize_optional_text(response_note)
+    if note is None:
+        raise AppError(422, "VALIDATION_ERROR", "拒絕取消合併時必須填寫原因。")
+
+    request.status = CancellationStatus.REJECTED
+    request.response_note = note
+    request.processed_at = datetime.now(timezone.utc)
+
+    notification_service.notify_order_event(
+        db,
+        user_id=target.user_id,
+        order_id=target.id,
+        title="取消合併申請未通過",
+        message=(
+            f"團主未通過訂單 {target.order_number} 的取消合併申請。\n"
+            f"團主說明：{note}\n如仍有疑問請直接聯絡團主。"
+        ),
+    )
+    db.commit()
+    db.refresh(request)
+    return order_service.build_unmerge_summary(db, request)
 
 
 def _transition(

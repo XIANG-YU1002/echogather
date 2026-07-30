@@ -41,6 +41,10 @@ class OrderStatus(str, enum.Enum):
     COMPLETED = "completed"
     CANCELLED = "cancelled"
     REJECTED = "rejected"
+    # 被合併進另一張訂單的來源訂單（使用者 2026-07-30 裁決）。前台會員端與團主端
+    # 一律不顯示這種訂單，資料完整保留以供拆單還原；不佔用庫存、不計入任何統計。
+    # 刻意不沿用 cancelled——否則會被算進「已取消」的頁籤數字，且每個查詢都得記得排除。
+    MERGED = "merged"
 
 
 class GroupBuyListSort(str, enum.Enum):
@@ -82,6 +86,15 @@ class GroupLeaderOrderStatusFilter(str, enum.Enum):
 
 # 「待處理」的組成。團主端統計與篩選都以此為單一來源，避免兩處各寫一份而不同步。
 PENDING_ORDER_STATUSES = (OrderStatus.PENDING_CONFIRMATION, OrderStatus.PENDING_PAYMENT)
+
+# 合併後仍可拆回的訂單狀態（使用者 2026-07-30）。已出貨之後不再拆，已取消／已拒絕沒有意義。
+# 與可合併狀態刻意一致。放在 enums 是因為訂單、通知、團主三個 service 都要判斷，
+# 而 notification_service 不能 import order_service（會形成循環匯入）。
+UNMERGE_ALLOWED_STATUSES = (
+    OrderStatus.PENDING_CONFIRMATION,
+    OrderStatus.PENDING_PAYMENT,
+    OrderStatus.PAID,
+)
 
 
 class CancellationStatus(str, enum.Enum):

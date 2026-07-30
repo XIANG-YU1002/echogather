@@ -199,6 +199,90 @@ class CancellationRequest(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     )
 
 
+class OrderMerge(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
+    """訂單合併紀錄，一張來源訂單一列（同一次合併的多張共用 batch_id）。
+
+    存在的理由是拆單要能「還原成合併前各自的狀態」（使用者 2026-07-30 裁決）：
+    來源訂單的明細在合併時是複製而非搬移，所以明細還在，但狀態與金額會被改動，
+    因此把來源與目標在合併前的狀態／金額一併快照下來，拆單時照著寫回。
+    目標訂單的三個 target_*_before 在同一批次的每一列都相同（刻意冗餘，換取單表可讀）。
+    """
+
+    __tablename__ = "order_merge"
+
+    batch_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    target_order_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("group_order.id", ondelete="CASCADE"), nullable=False
+    )
+    source_order_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("group_order.id", ondelete="CASCADE"), nullable=False
+    )
+    source_status_before: Mapped[OrderStatus] = mapped_column(order_status_enum, nullable=False)
+    source_paid_amount_before: Mapped[object] = mapped_column(Numeric(12, 2), nullable=False)
+    target_status_before: Mapped[OrderStatus] = mapped_column(order_status_enum, nullable=False)
+    target_product_total_before: Mapped[object] = mapped_column(Numeric(12, 2), nullable=False)
+    target_paid_amount_before: Mapped[object] = mapped_column(Numeric(12, 2), nullable=False)
+    # 已拆單的批次留著當歷史，靠這個欄位區分是否仍在合併狀態
+    unmerged_at: Mapped[object | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint("source_order_id", "batch_id", name="uq_order_merge_source_batch"),
+        CheckConstraint(
+            "target_order_id <> source_order_id", name="ck_order_merge_target_not_source"
+        ),
+        CheckConstraint(
+            "source_paid_amount_before >= 0 AND target_paid_amount_before >= 0 "
+            "AND target_product_total_before >= 0",
+            name="ck_order_merge_amounts_non_negative",
+        ),
+        Index("ix_order_merge_target_unmerged", "target_order_id", "unmerged_at"),
+        Index("ix_order_merge_batch", "batch_id"),
+    )
+
+
+class OrderUnmergeRequest(UUIDPrimaryKeyMixin, TimestampMixin, Base):
+    """會員提出的拆單（取消合併）申請，團主可核准或附原因拒絕。
+
+    流程與 CancellationRequest 相同（使用者 2026-07-30 裁決），因此沿用
+    CancellationStatus；order_id 指的是合併後保留的那張訂單，batch_id 指定要拆的批次。
+    """
+
+    __tablename__ = "order_unmerge_request"
+
+    order_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("group_order.id", ondelete="CASCADE"), nullable=False
+    )
+    batch_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[CancellationStatus] = mapped_column(
+        cancellation_status_enum,
+        nullable=False,
+        server_default=text(f"'{CancellationStatus.PENDING.value}'"),
+    )
+    response_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    processed_at: Mapped[object | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (
+        CheckConstraint(
+            "reason IS NULL OR length(trim(reason)) > 0",
+            name="ck_order_unmerge_request_reason_not_blank",
+        ),
+        CheckConstraint(
+            "response_note IS NULL OR length(trim(response_note)) > 0",
+            name="ck_order_unmerge_request_response_note_not_blank",
+        ),
+        CheckConstraint(
+            """
+            (status = 'pending' AND response_note IS NULL AND processed_at IS NULL)
+            OR
+            (status IN ('approved', 'rejected') AND processed_at IS NOT NULL)
+            """,
+            name="ck_order_unmerge_request_status_processed_pair",
+        ),
+        Index("ix_order_unmerge_request_order_status", "order_id", "status"),
+    )
+
+
 class OrderStatusHistory(UUIDPrimaryKeyMixin, CreatedAtMixin, Base):
     """訂單狀態異動歷史。
 

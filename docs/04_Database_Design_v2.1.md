@@ -622,6 +622,7 @@ shipped
 completed
 cancelled
 rejected
+merged
 ```
 
 | Value | Description |
@@ -633,6 +634,12 @@ rejected
 | completed | 訂單已完成 |
 | cancelled | 取消申請已通過 |
 | rejected | 團主拒絕接受訂單 |
+| merged | 已被併入另一張訂單（見 §6.15c） |
+
+> 新增紀錄（2026-07-30，migration `0011_order_merge_and_unmerge`）：`merged`。
+> 被團主合併掉的來源訂單標記為此狀態，會員端與團主端的列表、詳情與統計一律不顯示，
+> 資料完整保留以供拆單還原。原本寫成 `cancelled`，會被算進「已取消」的頁籤數字、
+> 語意也不對，故改為專屬狀態。`merged` 不佔用庫存（同 `cancelled`／`rejected`）。
 
 ---
 
@@ -2344,9 +2351,141 @@ CREATE INDEX ix_order_status_history_order_created
 2. group_leader_order_service._transition
      -> pending_payment / rejected / paid / shipped / completed
 3. group_leader_order_service.approve_cancellation -> cancelled
+4. group_leader_order_service.merge_orders
+     -> 來源訂單 merged（note 記「已合併至訂單 WGxxx」）
+     -> 目標訂單 pending_payment / paid（note 記併入了哪幾張）
+5. group_leader_order_service.approve_unmerge
+     -> 來源訂單還原成合併前的狀態（note 記「已從訂單 WGxxx 拆回」）
+     -> 目標訂單還原成合併前的狀態（note 記拆回了哪幾張）
 ```
 
-不在此表寫入的操作（例如取消申請被拒絕）不改變訂單狀態，故不產生紀錄。
+不在此表寫入的操作（例如取消申請被拒絕、拆單申請被拒絕）不改變訂單狀態，
+故不產生紀錄。
+
+---
+
+# 6.15c Order Merge Table
+
+> 新增紀錄（2026-07-30，migration `0011_order_merge_and_unmerge`）：
+> 依使用者需求，被合併的來源訂單改為專屬狀態 `merged`（原本寫成 `cancelled`），
+> 並支援「會員申請取消合併、團主核准後拆回」。拆回時要能還原成合併前各自的
+> 狀態與金額，因此把合併前的快照存在本表。
+
+Table Name：
+
+```text
+order_merge
+```
+
+用途：
+
+記錄每一次訂單合併。同一次合併操作共用一個 `batch_id`，其中每張來源訂單一列。
+拆單一律以整個批次為單位還原——部分還原會讓數量與金額算不回去。
+
+---
+
+## Columns
+
+| Column | Type | Nullable | Default | Description |
+|---|---|---:|---|---|
+| id | UUID | No | uuid4 | Primary Key |
+| batch_id | UUID | No | — | 同一次合併操作的批次編號 |
+| target_order_id | UUID | No | — | 合併後保留的訂單，`ON DELETE CASCADE` |
+| source_order_id | UUID | No | — | 被併掉的訂單，`ON DELETE CASCADE` |
+| source_status_before | OrderStatus | No | — | 來源訂單合併前的狀態（拆回時寫回） |
+| source_paid_amount_before | NUMERIC(12,2) | No | — | 來源訂單合併前的已收金額 |
+| target_status_before | OrderStatus | No | — | 目標訂單合併前的狀態 |
+| target_product_total_before | NUMERIC(12,2) | No | — | 目標訂單合併前的商品總額 |
+| target_paid_amount_before | NUMERIC(12,2) | No | — | 目標訂單合併前的已收金額 |
+| unmerged_at | TIMESTAMPTZ | Yes | NULL | 已拆回的時間；NULL 代表仍在合併狀態 |
+| created_at | TIMESTAMPTZ | No | now() | 合併時間 |
+
+`target_*_before` 三欄在同一批次的每一列都相同（刻意冗餘，換取單表可讀）。
+
+---
+
+## Constraints
+
+```sql
+UNIQUE (source_order_id, batch_id)
+
+CHECK (target_order_id <> source_order_id)
+CHECK (source_paid_amount_before >= 0
+       AND target_paid_amount_before >= 0
+       AND target_product_total_before >= 0)
+
+CREATE INDEX ix_order_merge_target_unmerged
+    ON order_merge (target_order_id, unmerged_at);
+CREATE INDEX ix_order_merge_batch ON order_merge (batch_id);
+```
+
+---
+
+## Rules
+
+1. 合併時來源訂單的明細是**複製**到目標訂單，來源保留自己的明細——拆回要靠這些明細。
+2. `merged` 與 `cancelled`／`rejected` 同屬不佔用庫存的狀態；否則同一筆訂購量會被
+   來源與目標各算一次。
+3. 已拆回的批次保留紀錄並填 `unmerged_at`，用來判斷「這批已經拆過」。
+4. 二次合併只能從**最新**批次往回拆：先拆舊批次會把新批次併進來的數量一起扣掉。
+
+---
+
+# 6.15d Order Unmerge Request Table
+
+> 新增紀錄（2026-07-30，migration `0011_order_merge_and_unmerge`）。
+
+Table Name：
+
+```text
+order_unmerge_request
+```
+
+用途：
+
+會員提出的取消合併（拆單）申請。流程與 `cancellation_request` 相同——會員提出、
+團主核准或附原因拒絕——因此沿用 `CancellationStatus`。
+
+---
+
+## Columns
+
+| Column | Type | Nullable | Default | Description |
+|---|---|---:|---|---|
+| id | UUID | No | uuid4 | Primary Key |
+| order_id | UUID | No | — | 合併後保留的那張訂單，`ON DELETE CASCADE` |
+| batch_id | UUID | No | — | 要拆回的合併批次 |
+| reason | TEXT | Yes | NULL | 會員填寫的原因（選填） |
+| status | CancellationStatus | No | 'pending' | pending／approved／rejected |
+| response_note | TEXT | Yes | NULL | 團主回覆；拒絕時必填 |
+| processed_at | TIMESTAMPTZ | Yes | NULL | 團主處理時間 |
+| created_at | TIMESTAMPTZ | No | now() | 申請時間 |
+| updated_at | TIMESTAMPTZ | No | now() | 更新時間 |
+
+---
+
+## Constraints
+
+```sql
+CHECK (reason IS NULL OR LENGTH(TRIM(reason)) > 0)
+CHECK (response_note IS NULL OR LENGTH(TRIM(response_note)) > 0)
+CHECK (
+    (status = 'pending' AND response_note IS NULL AND processed_at IS NULL)
+    OR
+    (status IN ('approved', 'rejected') AND processed_at IS NOT NULL)
+)
+
+CREATE INDEX ix_order_unmerge_request_order_status
+    ON order_unmerge_request (order_id, status);
+```
+
+---
+
+## Rules
+
+1. 同一張訂單同時只能有一筆 `pending` 申請。
+2. 被拒絕後會員可再次申請（同取消訂單申請的做法）。
+3. 訂單進入 `shipped` 之後不可再申請或核准拆單。
 
 # 6.16 Product Favorite Table
 

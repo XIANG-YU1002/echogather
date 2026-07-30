@@ -1863,7 +1863,7 @@ quantity > 0
 某開團商品的已占用數量：
 
 ```text
-所有 status 不為 cancelled 或 rejected 的訂單明細數量總和
+所有 status 不為 cancelled、rejected 或 merged 的訂單明細數量總和
 ```
 
 包含：
@@ -1875,6 +1875,12 @@ paid
 shipped
 completed
 ```
+
+> 修訂紀錄（2026-07-30）：新增排除 `merged`。合併時來源訂單的明細是**複製**到
+> 目標訂單、來源保留自己的明細作為歷史（拆單還原要用），若來源仍計入占用量，
+> 同一筆訂購量就會被算兩次而造成假性缺貨。
+
+分角色庫存的占用量以（開團商品, 所選角色）為單位計算，排除狀態相同。
 
 ---
 
@@ -1961,7 +1967,13 @@ shipped
 completed
 cancelled
 rejected
+merged
 ```
+
+> 新增紀錄（2026-07-30）：`merged` 代表「已被團主併入另一張訂單」。
+> 會員端與團主端的列表、詳情、統計與頁籤數字一律不顯示這種訂單（詳情回 404），
+> 資料庫完整保留以供拆單還原。原本合併是把來源訂單寫成 `cancelled`，
+> 會被算進「已取消」的數字、語意也不對。
 
 ---
 
@@ -1975,8 +1987,39 @@ rejected
 | paid | Mark Shipped | shipped | Group Leader |
 | shipped | Complete Order | completed | Group Leader |
 | pending_confirmation / pending_payment / paid | Approve Cancellation | cancelled | Group Leader |
+| pending_confirmation / pending_payment / paid | Merge Orders（來源） | merged | Group Leader |
+| pending_confirmation / pending_payment / paid | Merge Orders（目標） | pending_payment／paid | Group Leader |
+| merged | Approve Unmerge（來源） | 合併前的狀態 | Group Leader |
 
 未列出的直接轉換全部禁止。
+
+---
+
+## 21.2a Order Merge and Unmerge
+
+> 新增紀錄（合併 2026-07-29；拆單與 `merged` 狀態 2026-07-30）。
+
+**合併**（團主手動操作，非系統自動）：
+
+1. 限同一開團、同一會員、狀態為待確認／待付款／已付款、且無待處理取消申請。
+2. 保留哪一張（最舊／最新）由團主選擇——`created_at` 決定先喊先得的排隊順位，
+   因此不由系統決定。兩張訂單的 `created_at` 都不改寫。
+3. 同商品**同角色**的數量相加；不同角色維持獨立明細。
+4. 合併後狀態：全部已付款維持 `paid`，否則為 `pending_payment`
+   （團主願意合併即代表已確認這些訂單）。不新增「部分已付款」狀態，
+   已收金額記於 `paid_amount`，待收金額為總額減已收。
+5. 來源訂單狀態改為 `merged`，明細與金額保留不動。
+6. 通知會員：哪幾張併到哪一張、被併掉訂單的商品明細、金額說明、聯絡團主提示。
+
+**拆單（取消合併）**：
+
+1. 由**會員提出申請**（入口在通知中心該則合併通知底下），團主核准後才真正拆開。
+2. 團主可拒絕，但**必須填寫原因**；拒絕後訂單維持合併後的狀態，會員可再次申請。
+3. 核准後還原成合併前各自的狀態與金額（含已收金額），來源訂單重新顯示。
+4. 訂單進入 `shipped` 之後不可再拆。
+5. 同一張訂單同時只能有一筆待處理的拆單申請。
+6. 二次合併只能從最新批次往回拆。
+7. 核准與拒絕都會通知會員。
 
 ---
 

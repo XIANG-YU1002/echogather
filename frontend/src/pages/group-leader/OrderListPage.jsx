@@ -85,14 +85,21 @@ export default function OrderListPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const groupBuyId = searchParams.get("group_buy_id") ?? undefined;
 
-  // 狀態篩選以網址為單一來源：從儀表板帶 ?status=pending 進來後若只改元件狀態，
-  // 網址仍留著舊參數，重新整理就會跳回原本的篩選。
+  // 所有篩選條件（狀態、取消申請、活動、搜尋關鍵字）一律以網址為單一來源。
+  // 兩個理由：
+  // 1. 從儀表板帶 ?status=pending 進來後若只改元件狀態，網址仍留著舊參數，
+  //    重新整理就會跳回原本的篩選。
+  // 2. 點左側選單的「訂單管理」是導向 /group-leader/orders（沒有 query），
+  //    但同一路由不會讓元件重新掛載——篩選若存在元件狀態就會殘留，
+  //    使用者得離開頁面或 F5 才清得掉（使用者 2026-07-30 回報）。
   const status = searchParams.get("status") ?? undefined;
   const onlyPendingCancellation = searchParams.get("has_pending_cancellation") === "true";
+  const activityId = searchParams.get("activity_id") ?? "";
+  const keyword = searchParams.get("keyword") ?? "";
 
-  const [activityId, setActivityId] = useState("");
-  const [keyword, setKeyword] = useState("");
-  const [keywordInput, setKeywordInput] = useState("");
+  // 搜尋框的暫存輸入值。keyword 是「已送出」的條件，兩者刻意分開，
+  // 否則每打一個字就會查一次 API。
+  const [keywordInput, setKeywordInput] = useState(keyword);
   // 畫面預設「從新到舊」（使用者 2026-07-29 裁決）。
   // API 本身仍以先喊先得為預設（Business Rules §24.1），這裡明確帶參數覆寫。
   const [newestFirst, setNewestFirst] = useState(true);
@@ -136,6 +143,17 @@ export default function OrderListPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, groupBuyId, activityId, onlyPendingCancellation, keyword, newestFirst, page, pageSize]);
 
+  // 網址上的關鍵字被外部改掉時（點左側選單清空、瀏覽器上一頁），搜尋框要跟著更新，
+  // 否則框裡還留著文字卻已經不是實際的篩選條件。
+  useEffect(() => {
+    setKeywordInput(keyword);
+  }, [keyword]);
+
+  // 換篩選條件就回第一頁：原本停在第 3 頁時改篩選，結果集可能不足 3 頁而顯示空清單。
+  useEffect(() => {
+    setPage(1);
+  }, [status, groupBuyId, activityId, onlyPendingCancellation, keyword]);
+
   useEffect(() => {
     getMyGroupBuys(token, { pageSize: 50 })
       .then((response) => setMyGroupBuys(response.data))
@@ -153,30 +171,34 @@ export default function OrderListPage() {
     return [...seen.entries()].map(([id, name]) => ({ id, name }));
   }, [myGroupBuys]);
 
+  /** 更新網址上的篩選參數；值為空（undefined／""）代表移除該參數。 */
+  function updateParams(changes) {
+    const params = new URLSearchParams(searchParams);
+    Object.entries(changes).forEach(([key, value]) => {
+      if (value) {
+        params.set(key, value);
+      } else {
+        params.delete(key);
+      }
+    });
+    setSearchParams(params, { replace: true });
+  }
+
   function handleSearchSubmit(event) {
     event.preventDefault();
-    setPage(1);
-    setKeyword(keywordInput.trim());
+    updateParams({ keyword: keywordInput.trim() });
   }
 
   /**
    * 更新狀態篩選並同步網址，讓重新整理後的畫面與目前選擇一致。
-   * 兩個參數互斥：選了狀態就清掉取消申請篩選，反之亦然。
+   * 兩個參數互斥：選了狀態就清掉取消申請篩選，反之亦然
+   * （傳進 updateParams 的空值會被移除，互斥因此自動成立）。
    */
   function applyFilter({ nextStatus, pendingCancellation }) {
-    const params = new URLSearchParams(searchParams);
-    if (nextStatus) {
-      params.set("status", nextStatus);
-    } else {
-      params.delete("status");
-    }
-    if (pendingCancellation) {
-      params.set("has_pending_cancellation", "true");
-    } else {
-      params.delete("has_pending_cancellation");
-    }
-    setSearchParams(params, { replace: true });
-    setPage(1);
+    updateParams({
+      status: nextStatus,
+      has_pending_cancellation: pendingCancellation ? "true" : undefined,
+    });
   }
 
   /** 統計卡：點待處理取消申請切換該篩選，其餘切換狀態（點第二次取消）。 */
@@ -297,10 +319,7 @@ export default function OrderListPage() {
           aria-label="依活動篩選"
           className="ol-activity-select"
           value={activityId}
-          onChange={(event) => {
-            setActivityId(event.target.value);
-            setPage(1);
-          }}
+          onChange={(event) => updateParams({ activity_id: event.target.value })}
         >
           <option value="">所有活動</option>
           {activityOptions.map((activity) => (

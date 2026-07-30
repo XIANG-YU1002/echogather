@@ -180,3 +180,31 @@ def reject_cancellation(
         db, profile, request_id, payload.response_note
     )
     return envelope(result.model_dump(mode="json"))
+
+
+@router.post("/unmerge-requests/{request_id}/approve")
+def approve_unmerge(
+    request_id: uuid.UUID,
+    payload: ProcessCancellationRequest,
+    profile: GroupLeaderProfile = Depends(get_current_active_group_leader_profile),
+    db: Session = Depends(get_db),
+) -> dict:
+    """核准會員的取消合併申請，把訂單拆回合併前的多張。"""
+    result = group_leader_order_service.approve_unmerge(
+        db, profile, request_id, payload.response_note
+    )
+    return envelope(result.model_dump(mode="json"))
+
+
+@router.post("/unmerge-requests/{request_id}/reject")
+def reject_unmerge(
+    request_id: uuid.UUID,
+    payload: ProcessCancellationRequest,
+    profile: GroupLeaderProfile = Depends(get_current_active_group_leader_profile),
+    db: Session = Depends(get_db),
+) -> dict:
+    """拒絕取消合併申請（必須填原因），訂單維持合併後的狀態。"""
+    result = group_leader_order_service.reject_unmerge(
+        db, profile, request_id, payload.response_note
+    )
+    return envelope(result.model_dump(mode="json"))

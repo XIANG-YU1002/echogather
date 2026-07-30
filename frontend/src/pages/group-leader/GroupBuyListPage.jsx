@@ -50,13 +50,15 @@ function formatDeadline(isoString) {
 
 export default function GroupBuyListPage() {
   const { token } = useAuth();
-  const [searchParams] = useSearchParams();
-  // 供其他頁面連進來時帶入搜尋（例如圖 22 麵包屑的活動名稱）。
-  // 只取初始值：進站後的搜尋由頁面自己的狀態管理，不寫回網址。
-  const initialKeyword = searchParams.get("keyword") ?? "";
-  const [status, setStatus] = useState(undefined);
-  const [keyword, setKeyword] = useState(initialKeyword);
-  const [searchInput, setSearchInput] = useState(initialKeyword);
+  const [searchParams, setSearchParams] = useSearchParams();
+  // 篩選條件以網址為單一來源（docs/03 §23a）：原本只取初始值、之後由元件狀態管理，
+  // 導致點左側選單回到 /group-leader/group-buys（無 query）時搜尋殘留，
+  // 得離開頁面或 F5 才清得掉。也讓其他頁面能帶搜尋連進來（例如圖 22 麵包屑的活動名稱）。
+  const status = searchParams.get("status") ?? undefined;
+  const keyword = searchParams.get("keyword") ?? "";
+
+  // 搜尋框的未送出輸入值；keyword 才是實際條件，否則每打一個字就查一次 API
+  const [searchInput, setSearchInput] = useState(keyword);
   const [sort, setSort] = useState("created_desc");
   const [page, setPage] = useState(1);
   // 依圖 21 預設每頁 10 筆；卡片列表比表格佔空間，一頁 20 張要捲很久
@@ -83,7 +85,30 @@ export default function GroupBuyListPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, keyword, sort, page, pageSize]);
 
-  // 篩選條件一改就回第一頁，否則在第 3 頁切換篩選會看到空白清單
+  // 網址的關鍵字被外部改掉時（點選單清空、瀏覽器上一頁），搜尋框要跟著更新
+  useEffect(() => {
+    setSearchInput(keyword);
+  }, [keyword]);
+
+  // 網址上的篩選一改就回第一頁，否則在第 3 頁切換篩選會看到空白清單
+  useEffect(() => {
+    setPage(1);
+  }, [status, keyword]);
+
+  /** 更新網址上的篩選參數；值為空即移除該參數。 */
+  function updateParams(changes) {
+    const params = new URLSearchParams(searchParams);
+    Object.entries(changes).forEach(([key, value]) => {
+      if (value) {
+        params.set(key, value);
+      } else {
+        params.delete(key);
+      }
+    });
+    setSearchParams(params, { replace: true });
+  }
+
+  // 排序與每頁筆數不是篩選條件，維持元件狀態；改動時同樣回第一頁
   function changeFilter(setter) {
     return (value) => {
       setter(value);
@@ -93,8 +118,7 @@ export default function GroupBuyListPage() {
 
   function handleSearch(event) {
     event.preventDefault();
-    setKeyword(searchInput.trim());
-    setPage(1);
+    updateParams({ keyword: searchInput.trim() });
   }
 
   return (
@@ -133,7 +157,7 @@ export default function GroupBuyListPage() {
               key={tab.label}
               type="button"
               className={`gbl-tab${status === tab.value ? " is-active" : ""}`}
-              onClick={() => changeFilter(setStatus)(tab.value)}
+              onClick={() => updateParams({ status: tab.value })}
             >
               {tab.label}
             </button>
