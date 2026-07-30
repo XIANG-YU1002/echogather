@@ -50,3 +50,53 @@ select:disabled {
   color: var(--color-text-muted);
   cursor: not-allowed;
 }
+
+/* ---------------------------------------------------------------------------
+   輸入框全站統一外觀
+   與上面的下拉選單同一套語彙（白底、1px 邊框、10px 圓角、40px 高、0.9rem），
+   兩者並排時才會對齊。原本沒有全域基準，沒被個別 class 指定樣式的輸入框
+   （例如訂單篩選卡的「活動名稱」「團主名稱」）就是瀏覽器原生外觀。
+   勾選框／單選鈕／檔案／滑桿不套，它們的外觀與尺寸邏輯完全不同。
+--------------------------------------------------------------------------- */
+/* :where() 讓整串 :not() 的特異性歸零，選擇器維持在「元素」等級（0,0,1）。
+   直接寫 input:not(...):not(...):not(...):not(...) 會變成 0,4,1，比 .search-input input
+   這種 class 規則還高，反而把各頁自訂的邊框、底色與高度全部蓋掉。 */
+input:where(:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"])) {
+  height: 40px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background-color: var(--color-surface);
+  padding: 0 0.9rem;
+  font-size: 0.9rem;
+  font-family: inherit;
+  color: var(--color-text);
+}
+
+textarea {
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background-color: var(--color-surface);
+  padding: 0.6rem 0.9rem;
+  font-size: 0.9rem;
+  font-family: inherit;
+  line-height: 1.7;
+  color: var(--color-text);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--color-text-muted);
+}
+
+input:where(:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"])):focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+input:disabled,
+textarea:disabled {
+  background-color: var(--color-bg);
+  color: var(--color-text-muted);
+  cursor: not-allowed;
+}

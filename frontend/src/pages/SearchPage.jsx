@@ -128,29 +128,8 @@ function SummaryView({ q }) {
 
   return (
     <>
-      <section className="sr-section">
-        <div className="sr-section-head">
-          <h2 className="sr-section-title">
-            <span className="sr-section-icon">
-              <BagIcon />
-            </span>
-            商品
-            <span className="sr-section-count">{products.total_count} 件結果</span>
-          </h2>
-          {products.has_more && (
-            <Link className="sr-more" to={`/search?q=${encodeURIComponent(q)}&view=products`}>
-              查看更多
-              <ChevronRightIcon />
-            </Link>
-          )}
-        </div>
-        {products.items.length === 0 ? (
-          <EmptyState title="沒有符合的商品。" />
-        ) : (
-          <ProductGrid products={products.items} />
-        )}
-      </section>
-
+      {/* 角色放在商品前面：命中角色時，點進去看該角色的全部商品通常比看關鍵字
+          直接命中的幾件商品更接近使用者的目的（使用者 2026-07-30 裁決） */}
       <section className="sr-section">
         <div className="sr-section-head">
           <h2 className="sr-section-title">
@@ -181,6 +160,29 @@ function SummaryView({ q }) {
               </Link>
             ))}
           </div>
+        )}
+      </section>
+
+      <section className="sr-section">
+        <div className="sr-section-head">
+          <h2 className="sr-section-title">
+            <span className="sr-section-icon">
+              <BagIcon />
+            </span>
+            商品
+            <span className="sr-section-count">{products.total_count} 件結果</span>
+          </h2>
+          {products.has_more && (
+            <Link className="sr-more" to={`/search?q=${encodeURIComponent(q)}&view=products`}>
+              查看更多
+              <ChevronRightIcon />
+            </Link>
+          )}
+        </div>
+        {products.items.length === 0 ? (
+          <EmptyState title="沒有符合的商品。" />
+        ) : (
+          <ProductGrid products={products.items} />
         )}
       </section>
     </>

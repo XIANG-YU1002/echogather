@@ -64,6 +64,84 @@
   border: 1px solid var(--color-border);
   border-radius: 999px;
   padding: 0.25rem;
+  /* 建議清單以此為定位基準 */
+  position: relative;
+}
+
+/* ---------------------------------------------------------------------------
+   搜尋建議清單
+   輸入時即時列出符合的角色，讓使用者先確認是不是要找的那個角色，選了就直接
+   跳到該角色的商品（與搜尋結果頁的角色卡片同一個目的地）。
+   第一列固定是「搜尋『關鍵字』」＝原本的全站搜尋行為，直接按 Enter 也是它。
+--------------------------------------------------------------------------- */
+.search-suggest {
+  position: absolute;
+  top: calc(100% + 0.4rem);
+  left: 0;
+  right: 0;
+  z-index: 30;
+  padding: 0.35rem;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  box-shadow: 0 12px 28px rgb(15 23 42 / 12%);
+  max-height: 22rem;
+  overflow-y: auto;
+}
+
+.search-suggest-item {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  width: 100%;
+  padding: 0.55rem 0.7rem;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  font-family: inherit;
+  font-size: 0.9rem;
+  color: var(--color-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+/* 鍵盤上下鍵與滑鼠 hover 共用同一個選取樣式 */
+.search-suggest-item.is-active {
+  background-color: var(--color-bg);
+}
+
+.search-suggest-item.is-keyword {
+  font-weight: 600;
+}
+
+.search-suggest-item svg {
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+}
+
+.search-suggest-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search-suggest-count {
+  flex-shrink: 0;
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+}
+
+.search-suggest-group {
+  margin-top: 0.2rem;
+  padding: 0.4rem 0.7rem 0.25rem;
+  border-top: 1px solid var(--color-border);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
 }
 
 .search-input input {
@@ -72,6 +150,8 @@
   border: none;
   background: none;
   outline: none;
+  /* 高度交給膠囊容器決定：全域 input 基準有 height 40px，不解掉會把容器撐高 */
+  height: auto;
   padding: 0.35rem 0.5rem;
   font-size: 0.9rem;
   color: var(--color-text);
@@ -8842,6 +8922,8 @@ a.od-contact-value:hover {
   min-width: 0;
   border: none;
   border-radius: 0;
+  /* 高度由整列容器決定；全域 input 基準的 height 40px 要解掉 */
+  height: auto;
   padding: 0.7rem 0.85rem;
   font-size: 0.88rem;
 }
