@@ -180,6 +180,20 @@ export default function GroupBuyCreatePage() {
       setSubmitError("請先於團主資料設定該聯絡方式，才能建立開團。");
       return;
     }
+    // 多角色商品可以把不接的角色設 0，但不能全部設 0——那等於整個商品都不接，
+    // 應該直接取消勾選。單一角色的 0 由輸入框 min="1" 擋掉。
+    const allZeroProduct = selectedEntries.find(({ product, values }) => {
+      if (product.characters.length < 2) return false;
+      return product.characters.every(
+        (character) => Number(values.character_quantities?.[character.id]) === 0,
+      );
+    });
+    if (allZeroProduct) {
+      setSubmitError(
+        `「${allZeroProduct.product.name}」的所有角色接單上限都是 0，請至少開放一個角色，或取消勾選這項商品。`,
+      );
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -192,15 +206,20 @@ export default function GroupBuyCreatePage() {
                 character_id: character.id,
                 max_quantity: Number(values.character_quantities?.[character.id]),
               }))
-              .filter((entry) => entry.max_quantity > 0);
+              // 0＝不接這個角色的單，一定要送出去（濾掉就會被後端 fallback 成商品上限）；
+              // 只有沒填的欄位（空字串轉成 NaN）才略過。
+              .filter((entry) => Number.isFinite(entry.max_quantity) && entry.max_quantity >= 0);
             return {
               product_id: product.id,
               unit_price: values.unit_price,
-              // 多角色商品的整體上限由後端加總各角色，這裡送任一正數即可；
+              // 多角色商品的整體上限由後端加總各角色，這裡送總和保持一致；
               // 無角色商品才真正使用這個值。
               max_quantity:
                 product.characters.length > 0
-                  ? Math.max(...characterQuantities.map((entry) => entry.max_quantity), 1)
+                  ? Math.max(
+                      characterQuantities.reduce((sum, entry) => sum + entry.max_quantity, 0),
+                      1,
+                    )
                   : Number(values.max_quantity),
               character_quantities: characterQuantities,
             };
@@ -385,8 +404,15 @@ export default function GroupBuyCreatePage() {
                               <span key={character.id} className="gbc-stack-row">
                                 <input
                                   type="number"
-                                  min="1"
+                                  // 多角色商品可填 0＝不接這個角色的單；
+                                  // 只有一個角色時填 0 等於整個商品不接，不允許。
+                                  min={product.characters.length > 1 ? "0" : "1"}
                                   required
+                                  title={
+                                    product.characters.length > 1
+                                      ? "填 0 表示不接這個角色的單"
+                                      : undefined
+                                  }
                                   aria-label={`${product.name} ${character.name} 接單上限`}
                                   value={values.character_quantities?.[character.id] ?? ""}
                                   onChange={(event) =>

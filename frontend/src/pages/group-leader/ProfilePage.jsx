@@ -12,6 +12,8 @@ import Alert from "../../components/common/Alert.jsx";
 import Button from "../../components/common/Button.jsx";
 import ErrorState from "../../components/common/ErrorState.jsx";
 import FormField from "../../components/common/FormField.jsx";
+import ImageCropper from "../../components/common/ImageCropper.jsx";
+import Modal from "../../components/common/Modal.jsx";
 import PageLoader from "../../components/common/PageLoader.jsx";
 import {
   DiscordIcon,
@@ -44,6 +46,8 @@ export default function ProfilePage() {
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState(null);
+  // 選好但還沒裁切的頭像檔；有值時彈出裁切燈窗
+  const [pendingAvatar, setPendingAvatar] = useState(null);
   const fileInputRef = useRef(null);
 
   function load() {
@@ -70,19 +74,26 @@ export default function ProfilePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function handleAvatarChange(event) {
+  function handleAvatarPick(event) {
     const file = event.target.files?.[0];
+    event.target.value = "";
     if (!file) return;
+    setFeedback(null);
+    setPendingAvatar(file);
+  }
+
+  /** 裁切成 1:1 後才上傳，頭像在各處都是圓形顯示，不裁切會被壓變形。 */
+  async function handleAvatarCropConfirm(croppedFile) {
     setUploading(true);
     try {
-      const uploadResponse = await uploadImage(file, "avatar", token);
+      const uploadResponse = await uploadImage(croppedFile, "avatar", token);
       await updateMyProfile({ avatar_url: uploadResponse.data.url }, token);
       setAvatarUrl(uploadResponse.data.url);
+      setPendingAvatar(null);
     } catch {
       setFeedback({ type: "error", message: "頭像上傳失敗，請稍後再試。" });
     } finally {
       setUploading(false);
-      event.target.value = "";
     }
   }
 
@@ -204,7 +215,7 @@ export default function ProfilePage() {
                   type="file"
                   accept="image/jpeg,image/png,image/webp"
                   style={{ display: "none" }}
-                  onChange={handleAvatarChange}
+                  onChange={handleAvatarPick}
                 />
                 <Button
                   type="button"
@@ -297,7 +308,9 @@ export default function ProfilePage() {
 
             {contactRows.map((row) => (
               <div className="glp-contact-row" key={row.key}>
-                <span className="glp-contact-label">
+                {/* class 名不可與團主公開頁的 .glp-contact-label 相同：兩頁共用 glp- 前綴，
+                    同名會互相覆寫（本頁的固定寬灰底標籤曾把公開頁的聯絡方式撐出一條灰白色塊） */}
+                <span className="glp-contact-row-label">
                   <row.Icon />
                   {row.label}
                 </span>
@@ -361,6 +374,22 @@ export default function ProfilePage() {
           </div>
         </div>
       </form>
+
+      {pendingAvatar && (
+        <Modal title="裁切頭像" onClose={() => setPendingAvatar(null)}>
+          <ImageCropper
+            file={pendingAvatar}
+            aspectRatio={1}
+            aspectLabel="1:1"
+            round
+            loading={uploading}
+            confirmLabel="套用並上傳"
+            onCancel={() => setPendingAvatar(null)}
+            onPickAnother={() => fileInputRef.current?.click()}
+            onConfirm={handleAvatarCropConfirm}
+          />
+        </Modal>
+      )}
     </>
   );
 }

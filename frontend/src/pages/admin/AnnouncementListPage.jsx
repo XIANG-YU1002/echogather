@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   createAdminAnnouncement,
   deleteAdminAnnouncement,
@@ -30,10 +31,14 @@ function formatDateTime(isoString) {
 
 export default function AnnouncementListPage() {
   const { token } = useAuth();
+  // 搜尋關鍵字以網址為單一來源（docs/03 §23a）：只存在元件狀態時，
+  // 點側邊選單回到同一路由不會重新掛載元件，搜尋條件就會殘留。
+  const [searchParams, setSearchParams] = useSearchParams();
+  const keyword = searchParams.get("keyword") ?? "";
+
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(5);
-  const [keyword, setKeyword] = useState("");
-  const [keywordInput, setKeywordInput] = useState("");
+  const [keywordInput, setKeywordInput] = useState(keyword);
   const [announcements, setAnnouncements] = useState(null);
   const [pagination, setPagination] = useState(null);
   const [error, setError] = useState(false);
@@ -62,10 +67,26 @@ export default function AnnouncementListPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [keyword, page, pageSize]);
 
+  // 網址的關鍵字被外部改掉時（點側邊選單、瀏覽器上一頁），搜尋框要跟著更新
+  useEffect(() => {
+    setKeywordInput(keyword);
+  }, [keyword]);
+
+  // 換關鍵字就回第一頁，否則可能停在超出範圍的頁碼而顯示空清單
+  useEffect(() => {
+    setPage(1);
+  }, [keyword]);
+
   function handleSearchSubmit(event) {
     event.preventDefault();
-    setPage(1);
-    setKeyword(keywordInput.trim());
+    const params = new URLSearchParams(searchParams);
+    const next = keywordInput.trim();
+    if (next) {
+      params.set("keyword", next);
+    } else {
+      params.delete("keyword");
+    }
+    setSearchParams(params, { replace: true });
   }
 
   function openCreateForm() {

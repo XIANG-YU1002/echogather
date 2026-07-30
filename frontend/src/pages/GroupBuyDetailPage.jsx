@@ -8,6 +8,7 @@ import Alert from "../components/common/Alert.jsx";
 import Breadcrumb from "../components/common/Breadcrumb.jsx";
 import Button from "../components/common/Button.jsx";
 import ConfirmModal from "../components/common/ConfirmModal.jsx";
+import ContactValue from "../components/common/ContactValue.jsx";
 import ErrorState from "../components/common/ErrorState.jsx";
 import PageLoader from "../components/common/PageLoader.jsx";
 import {
@@ -434,7 +435,17 @@ export default function GroupBuyDetailPage() {
               <InfoItem
                 icon={<ChatIcon />}
                 label="主要聯絡方式"
-                value={`${CONTACT_PLATFORM_LABELS[groupBuy.contact_platform]}：${groupBuy.contact_value}`}
+                value={
+                  <>
+                    {CONTACT_PLATFORM_LABELS[groupBuy.contact_platform]}：
+                    <ContactValue
+                      platform={groupBuy.contact_platform}
+                      value={groupBuy.contact_value}
+                      displayName={groupBuy.group_leader.display_name}
+                      className="oc-contact-link"
+                    />
+                  </>
+                }
               />
             </div>
 

@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { listGroupLeaders } from "../api/groupLeaders.js";
 import { resolveMediaUrl } from "../api/client.js";
 import Breadcrumb from "../components/common/Breadcrumb.jsx";
+import { facebookHref } from "../components/common/ContactValue.jsx";
 import EmptyState from "../components/common/EmptyState.jsx";
 import ErrorState from "../components/common/ErrorState.jsx";
 import PageLoader from "../components/common/PageLoader.jsx";
@@ -40,18 +41,6 @@ function formatJoinDate(isoString) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
-/**
- * Facebook 欄位存的是網址（group_leader_profile.facebook_url），能判定為網址時
- * 顯示成以團主名稱為文字的超連結；判定不出來就照團主填寫的內容原樣顯示。
- */
-function facebookHref(value) {
-  if (!value) return null;
-  const trimmed = value.trim();
-  if (/^https?:\/\//i.test(trimmed)) return trimmed;
-  if (/^(www\.)?facebook\.com\//i.test(trimmed)) return `https://${trimmed}`;
-  return null;
-}
-
 function ContactCell({ contact, profile }) {
   const value = profile.public_contacts[contact.key];
   const Icon = contact.icon;
@@ -84,8 +73,12 @@ function ContactCell({ contact, profile }) {
 }
 
 export default function GroupLeaderListPage() {
-  const [keyword, setKeyword] = useState("");
-  const [keywordInput, setKeywordInput] = useState("");
+  // 搜尋關鍵字以網址為單一來源（docs/03 §23a）：只存在元件狀態時，
+  // 從選單或 Logo 導回同一路由不會重新掛載元件，搜尋條件就會殘留。
+  const [searchParams, setSearchParams] = useSearchParams();
+  const keyword = searchParams.get("keyword") ?? "";
+
+  const [keywordInput, setKeywordInput] = useState(keyword);
   const [sort, setSort] = useState("created_desc");
   const [page, setPage] = useState(1);
   const [profiles, setProfiles] = useState(null);
@@ -108,10 +101,26 @@ export default function GroupLeaderListPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [keyword, page, sort]);
 
+  // 網址的關鍵字被外部改掉時（導回本頁、瀏覽器上一頁），搜尋框要跟著更新
+  useEffect(() => {
+    setKeywordInput(keyword);
+  }, [keyword]);
+
+  // 換關鍵字就回第一頁，否則可能停在超出範圍的頁碼而顯示空清單
+  useEffect(() => {
+    setPage(1);
+  }, [keyword]);
+
   function handleSearchSubmit(event) {
     event.preventDefault();
-    setPage(1);
-    setKeyword(keywordInput.trim());
+    const params = new URLSearchParams(searchParams);
+    const next = keywordInput.trim();
+    if (next) {
+      params.set("keyword", next);
+    } else {
+      params.delete("keyword");
+    }
+    setSearchParams(params, { replace: true });
   }
 
   return (

@@ -138,6 +138,23 @@ def name_exists_in_activity(
     return db.execute(stmt).scalar_one_or_none() is not None
 
 
+def get_activity_currency(
+    db: Session, activity_id: uuid.UUID, exclude_product_id: uuid.UUID | None = None
+) -> str | None:
+    """同一活動已在使用的官方價幣別；還沒有任何標價商品時回 None。
+
+    依使用者 2026-07-30 規則：同一活動的商品幣別必須一致，不能有的台幣有的日圓。
+    只看有標價的商品——沒填官方價的商品 official_currency 為 NULL，不構成限制。
+    """
+    stmt = select(Product.official_currency).where(
+        Product.activity_id == activity_id,
+        Product.official_currency.is_not(None),
+    )
+    if exclude_product_id is not None:
+        stmt = stmt.where(Product.id != exclude_product_id)
+    return db.execute(stmt.limit(1)).scalar_one_or_none()
+
+
 def create_product(db: Session, **fields) -> Product:
     product = Product(**fields)
     db.add(product)

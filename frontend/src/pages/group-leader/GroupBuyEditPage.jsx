@@ -56,6 +56,9 @@ export default function GroupBuyEditPage() {
 
   const [settings, setSettings] = useState(null);
   const [productMaxQuantities, setProductMaxQuantities] = useState({});
+  // 多角色商品的每角色接單上限：{ [開團商品 id]: { [角色 id]: 值 } }。
+  // 團主可把不接的角色調成 0（例如某角色缺貨），不必移除整個商品。
+  const [characterQuantities, setCharacterQuantities] = useState({});
 
   const [newProducts, setNewProducts] = useState([]);
   const [newProductId, setNewProductId] = useState("");
@@ -84,6 +87,18 @@ export default function GroupBuyEditPage() {
         });
         setProductMaxQuantities(
           Object.fromEntries(data.products.map((item) => [item.id, item.max_quantity])),
+        );
+        setCharacterQuantities(
+          Object.fromEntries(
+            data.products
+              .filter((item) => item.character_stock.length > 0)
+              .map((item) => [
+                item.id,
+                Object.fromEntries(
+                  item.character_stock.map((stock) => [stock.character_id, stock.max_quantity]),
+                ),
+              ]),
+          ),
         );
         if (!data.has_orders) {
           getActivityProducts(data.activity.id).then((productResponse) => {
@@ -155,13 +170,35 @@ export default function GroupBuyEditPage() {
 
   async function handleSaveMaxQuantity(groupBuyProductId) {
     setFeedback(null);
+    const product = groupBuy.products.find((item) => item.id === groupBuyProductId);
+    // 多角色商品改送每角色上限（後端會把商品層級上限同步成總和）；
+    // 無角色商品維持只送商品層級上限。
+    let payload;
+    if (product && product.character_stock.length > 0) {
+      const entries = product.character_stock.map((stock) => ({
+        character_id: stock.character_id,
+        max_quantity: Number(characterQuantities[groupBuyProductId]?.[stock.character_id]),
+      }));
+      if (entries.some((entry) => !Number.isFinite(entry.max_quantity) || entry.max_quantity < 0)) {
+        setFeedback({ type: "error", message: "每個角色的接單上限都要填 0 以上的整數。" });
+        return;
+      }
+      if (entries.every((entry) => entry.max_quantity === 0)) {
+        setFeedback({
+          type: "error",
+          message:
+            product.character_stock.length === 1
+              ? "此商品只有一個角色，接單上限至少為 1；不接單請移除這項商品。"
+              : "請至少開放一個角色的接單上限，全部不接請移除這項商品。",
+        });
+        return;
+      }
+      payload = { character_quantities: entries };
+    } else {
+      payload = { max_quantity: Number(productMaxQuantities[groupBuyProductId]) };
+    }
     try {
-      await updateGroupBuyProduct(
-        groupBuyId,
-        groupBuyProductId,
-        { max_quantity: Number(productMaxQuantities[groupBuyProductId]) },
-        token,
-      );
+      await updateGroupBuyProduct(groupBuyId, groupBuyProductId, payload, token);
       setFeedback({ type: "success", message: "接單上限已更新。" });
       load();
     } catch (err) {
@@ -494,8 +531,9 @@ export default function GroupBuyEditPage() {
           </h2>
           {isEditable("rules") ? (
             <textarea
+              className="gbe-rules-input"
               aria-label="開團規則"
-              rows={6}
+              rows={8}
               value={settings.rules}
               onChange={(event) => setSettings((prev) => ({ ...prev, rules: event.target.value }))}
             />
@@ -526,7 +564,8 @@ export default function GroupBuyEditPage() {
       <section className="gbe-card">
         <h2 className="gbe-card-title">已選擇商品</h2>
         <p className="helper-text" style={{ marginTop: 0 }}>
-          單價不可修改；接單上限可調整，但不得低於已占用數量。
+          單價不可修改；接單上限可調整，但不得低於已占用數量。多角色商品可把個別角色填 0
+          ＝不接這個角色的單（至少要開放一個角色）。
         </p>
         <div className="table-wrap">
           <table className="table">
@@ -549,35 +588,78 @@ export default function GroupBuyEditPage() {
                         src={resolveMediaUrl(item.product.primary_image_url)}
                         alt=""
                       />
-                      <span>
-                        {item.product.name}
-                        {item.character_stock.length > 0 && (
-                          <span className="gbe-character-stock">
-                            {item.character_stock.map((stock) => (
-                              <span key={stock.character_id}>
-                                {stock.name}：{stock.occupied_quantity}／{stock.max_quantity}
-                              </span>
-                            ))}
-                          </span>
-                        )}
-                      </span>
+                      <span>{item.product.name}</span>
                     </span>
                   </td>
                   <td>{item.unit_price}</td>
-                  <td>{item.occupied_quantity}</td>
+                  {/* 多角色商品的「已訂購」與「接單上限」逐角色一行，兩欄對齊 */}
                   <td>
-                    <input
-                      type="number"
-                      min={item.occupied_quantity}
-                      style={{ width: "5rem" }}
-                      value={productMaxQuantities[item.id] ?? item.max_quantity}
-                      onChange={(event) =>
-                        setProductMaxQuantities((prev) => ({
-                          ...prev,
-                          [item.id]: event.target.value,
-                        }))
-                      }
-                    />
+                    {item.character_stock.length > 0 ? (
+                      <div className="gbe-qty-stack">
+                        {item.character_stock.map((stock) => (
+                          <span className="gbe-qty-row" key={stock.character_id}>
+                            <span className="gbe-qty-name">{stock.name}</span>
+                            {stock.occupied_quantity}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      item.occupied_quantity
+                    )}
+                  </td>
+                  <td>
+                    {item.character_stock.length > 0 ? (
+                      <div className="gbe-qty-stack">
+                        {item.character_stock.map((stock) => (
+                          <span className="gbe-qty-row" key={stock.character_id}>
+                            <input
+                              type="number"
+                              // 已被訂單占用的數量是下限；沒被占用時，多角色可填 0＝不接這個角色，
+                              // 只有一個角色的商品填 0 等於整個商品不接，所以至少 1。
+                              min={Math.max(
+                                stock.occupied_quantity,
+                                item.character_stock.length > 1 ? 0 : 1,
+                              )}
+                              style={{ width: "5rem" }}
+                              title={
+                                item.character_stock.length > 1
+                                  ? "填 0 表示不接這個角色的單"
+                                  : undefined
+                              }
+                              aria-label={`${item.product.name} ${stock.name} 接單上限`}
+                              value={
+                                characterQuantities[item.id]?.[stock.character_id] ??
+                                stock.max_quantity
+                              }
+                              onChange={(event) =>
+                                setCharacterQuantities((prev) => ({
+                                  ...prev,
+                                  [item.id]: {
+                                    ...prev[item.id],
+                                    [stock.character_id]: event.target.value,
+                                  },
+                                }))
+                              }
+                            />
+                          </span>
+                        ))}
+                        <span className="gbe-qty-total">商品總上限 {item.max_quantity}</span>
+                      </div>
+                    ) : (
+                      <input
+                        type="number"
+                        min={Math.max(item.occupied_quantity, 1)}
+                        style={{ width: "5rem" }}
+                        aria-label={`${item.product.name} 接單上限`}
+                        value={productMaxQuantities[item.id] ?? item.max_quantity}
+                        onChange={(event) =>
+                          setProductMaxQuantities((prev) => ({
+                            ...prev,
+                            [item.id]: event.target.value,
+                          }))
+                        }
+                      />
+                    )}
                   </td>
                   <td>
                     <div className="group-buy-card-row" style={{ flexWrap: "nowrap" }}>

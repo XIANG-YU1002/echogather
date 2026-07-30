@@ -77,8 +77,10 @@ export function HeartIcon({ className, filled = false }) {
       xmlns="http://www.w3.org/2000/svg"
       aria-hidden="true"
     >
+      {/* 左右嚴格對稱（以 x=12 為軸）：舊路徑左肩落在 x=2.7、右肩只到 17.3，
+          兩邊不等寬，愛心看起來是歪的。 */}
       <path
-        d="M12 20s-7-4.35-9.3-8.4C1.2 8.9 2.5 5.8 5.5 5.2c1.9-.38 3.6.62 4.5 2 .9-1.38 2.6-2.38 4.5-2 3 .6 4.3 3.7 2.8 6.4C19 15.65 12 20 12 20Z"
+        d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.53L12 21.35z"
         stroke="currentColor"
         strokeWidth="1.6"
         strokeLinejoin="round"
@@ -434,6 +436,16 @@ export function DiscordIcon({ className }) {
         d="M16.6 8.1a9.6 9.6 0 0 0-2.4-.7l-.3.6c-.9-.1-1.8-.1-2.6 0l-.3-.6c-.9.1-1.7.4-2.5.7-1.5 2.2-1.9 4.4-1.7 6.5a9.8 9.8 0 0 0 3 1.5l.6-1c-.3-.1-.7-.3-1-.5l.2-.2a6.9 6.9 0 0 0 5.9 0l.2.2c-.3.2-.6.4-1 .5l.6 1c1.1-.3 2.1-.8 3-1.5.3-2.4-.4-4.6-1.7-6.5Zm-6.3 5.2c-.6 0-1.1-.5-1.1-1.2s.5-1.2 1.1-1.2c.6 0 1.1.5 1.1 1.2s-.5 1.2-1.1 1.2Zm3.4 0c-.6 0-1.1-.5-1.1-1.2s.5-1.2 1.1-1.2c.6 0 1.1.5 1.1 1.2s-.5 1.2-1.1 1.2Z"
         fill="#fff"
       />
+    </svg>
+  );
+}
+
+/** 中性狀態（既非成立也非警告），例如圖 31 審核重點的「尚未具有團主資格」。 */
+export function MinusCircleIcon({ className }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <circle cx="12" cy="12" r="8.5" stroke="currentColor" strokeWidth="1.6" />
+      <path d="M8.5 12h7" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
     </svg>
   );
 }

@@ -7,6 +7,7 @@ import {
 } from "../api/groupLeaders.js";
 import { ApiError, resolveMediaUrl } from "../api/client.js";
 import Breadcrumb from "../components/common/Breadcrumb.jsx";
+import { facebookHref } from "../components/common/ContactValue.jsx";
 import MediaImage from "../components/common/MediaImage.jsx";
 import EmptyState from "../components/common/EmptyState.jsx";
 import ErrorState from "../components/common/ErrorState.jsx";
@@ -43,18 +44,6 @@ function formatDeadline(isoString) {
   const pad = (n) => String(n).padStart(2, "0");
   return `${date.getFullYear()}/${pad(date.getMonth() + 1)}/${pad(date.getDate())} ` +
     `${pad(date.getHours())}:${pad(date.getMinutes())}`;
-}
-
-/**
- * Facebook 公開聯絡欄位存的是網址；能判定為網址時做成超連結，
- * 連結文字用團主名稱（與圖 12 團主列表頁一致）。
- */
-function facebookHref(value) {
-  if (!value) return null;
-  const trimmed = value.trim();
-  if (/^https?:\/\//i.test(trimmed)) return trimmed;
-  if (/^(www\.)?facebook\.com\//i.test(trimmed)) return `https://${trimmed}`;
-  return null;
 }
 
 /**

@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { getAdminApplications } from "../../api/adminGroupLeaderApplications.js";
 import { resolveMediaUrl } from "../../api/client.js";
 import { useAuth } from "../../context/AuthContext.jsx";
+import ContactValue from "../../components/common/ContactValue.jsx";
 import EmptyState from "../../components/common/EmptyState.jsx";
 import ErrorState from "../../components/common/ErrorState.jsx";
 import PageLoader from "../../components/common/PageLoader.jsx";
@@ -49,9 +50,14 @@ function contactSummary(user) {
 
 export default function GroupLeaderApplicationListPage() {
   const { token } = useAuth();
-  const [status, setStatus] = useState("pending");
-  const [keyword, setKeyword] = useState("");
-  const [keywordInput, setKeywordInput] = useState("");
+  // 篩選以網址為單一來源（docs/03 §23a）：只存在元件狀態時，點側邊選單回到
+  // 同一路由不會重新掛載元件，狀態與搜尋條件就會殘留。
+  // 網址沒帶 status 時維持預設的「待審核」。
+  const [searchParams, setSearchParams] = useSearchParams();
+  const status = searchParams.get("status") ?? "pending";
+  const keyword = searchParams.get("keyword") ?? "";
+
+  const [keywordInput, setKeywordInput] = useState(keyword);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(5);
   const [applications, setApplications] = useState(null);
@@ -65,7 +71,8 @@ export default function GroupLeaderApplicationListPage() {
       setApplications(null);
     }
     return getAdminApplications(token, {
-      status: status || undefined,
+      // all＝不帶狀態條件（見下方 select 的註解）
+      status: status === "all" ? undefined : status || undefined,
       keyword: keyword || undefined,
       page,
       pageSize,
@@ -89,10 +96,32 @@ export default function GroupLeaderApplicationListPage() {
   // 新申請進來時自動出現，不必手動重新整理
   useAutoRefresh(() => load({ silent: true }));
 
+  // 網址的關鍵字被外部改掉時（點側邊選單、瀏覽器上一頁），搜尋框要跟著更新
+  useEffect(() => {
+    setKeywordInput(keyword);
+  }, [keyword]);
+
+  // 換篩選就回第一頁，否則可能停在超出範圍的頁碼而顯示空清單
+  useEffect(() => {
+    setPage(1);
+  }, [status, keyword]);
+
+  /** 更新網址上的篩選參數；值為空即移除該參數。 */
+  function updateParams(changes) {
+    const params = new URLSearchParams(searchParams);
+    Object.entries(changes).forEach(([key, value]) => {
+      if (value) {
+        params.set(key, value);
+      } else {
+        params.delete(key);
+      }
+    });
+    setSearchParams(params, { replace: true });
+  }
+
   function handleSearchSubmit(event) {
     event.preventDefault();
-    setPage(1);
-    setKeyword(keywordInput.trim());
+    updateParams({ keyword: keywordInput.trim() });
   }
 
   return (
@@ -117,16 +146,15 @@ export default function GroupLeaderApplicationListPage() {
         <select
           className="admin-toolbar-select"
           value={status}
-          onChange={(event) => {
-            setStatus(event.target.value);
-            setPage(1);
-          }}
+          onChange={(event) => updateParams({ status: event.target.value })}
           aria-label="狀態篩選"
         >
           <option value="pending">待審核</option>
           <option value="approved">已核准</option>
           <option value="rejected">已拒絕</option>
-          <option value="">全部狀態</option>
+          {/* 「全部」用明確值 all 而非空字串：空值會被 updateParams 從網址移除，
+              讀回來又變成預設的 pending，等於選不到全部 */}
+          <option value="all">全部狀態</option>
         </select>
       </div>
 
@@ -177,7 +205,17 @@ export default function GroupLeaderApplicationListPage() {
                               className={`contact-summary-line${item.muted ? " muted" : ""}`}
                             >
                               <Icon />
-                              {item.value}
+                              {/* Facebook 存的是網址，直接印會撐破這一欄 */}
+                              {item.key === "facebook" ? (
+                                <ContactValue
+                                  platform="facebook"
+                                  value={item.value}
+                                  displayName={application.user.nickname}
+                                  className="oc-contact-link"
+                                />
+                              ) : (
+                                item.value
+                              )}
                             </span>
                           );
                         })}

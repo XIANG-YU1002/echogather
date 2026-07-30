@@ -566,27 +566,7 @@
   color: var(--color-text-muted);
 }
 
-.sort-control select {
-  height: 40px;
-  border: 1px solid var(--color-border);
-  border-radius: 10px;
-  background-color: var(--color-surface);
-  padding: 0 2.2rem 0 0.9rem;
-  font-size: 0.9rem;
-  color: var(--color-text);
-  cursor: pointer;
-  appearance: none;
-  -webkit-appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239a9aa8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 0.8rem center;
-  background-size: 0.8rem;
-}
-
-.sort-control select:focus {
-  outline: none;
-  border-color: var(--color-primary);
-}
+/* 這裡原本那份樣式已升格為 global.css 的全站下拉基準，不需要再重寫一次 */
 
 .activity-detail-header,
 .product-detail-header,
@@ -763,18 +743,20 @@
   gap: 0.6rem;
 }
 
+/* 刻意不設 aspect-ratio：商品圖允許任意比例上傳（使用者 2026-07-30），
+   固定比例會讓非該比例的圖不是被裁掉（cover）就是產生白邊（contain）。
+   高度交給圖片自己決定，兩者都不會發生。 */
 .gallery-main {
   position: relative;
-  aspect-ratio: 16 / 9;
   border-radius: 16px;
   overflow: hidden;
-  background-color: #eceef5;
+  line-height: 0;
 }
 
 .gallery-main img {
+  display: block;
   width: 100%;
-  height: 100%;
-  object-fit: cover;
+  height: auto;
   cursor: zoom-in;
 }
 
@@ -808,10 +790,46 @@
   right: 0.5rem;
 }
 
+/* 縮圖列兩端各有一顆捲動鈕（依使用者提供的參考圖） */
+.gallery-thumbs-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.gallery-thumb-nav {
+  flex-shrink: 0;
+  width: 1.75rem;
+  height: 1.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+  background-color: var(--color-surface);
+  color: var(--color-text-muted);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.gallery-thumb-nav:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
 .gallery-thumbs {
   display: flex;
   gap: 0.5rem;
   overflow-x: auto;
+  /* 捲動時縮圖對齊邊界，不會停在一半 */
+  scroll-snap-type: x proximity;
+  scrollbar-width: none;
+}
+
+.gallery-thumbs::-webkit-scrollbar {
+  display: none;
+}
+
+.gallery-thumbs img {
+  scroll-snap-align: start;
 }
 
 .gallery-thumbs img {
@@ -1024,10 +1042,6 @@
   border-bottom: 1px solid var(--color-border);
   font-size: 0.9rem;
   color: var(--color-text-muted);
-}
-
-.compare-filters .sort-control select {
-  height: 38px;
 }
 
 .compare-filter-check {
@@ -2364,11 +2378,14 @@
   color: var(--color-text-muted);
 }
 
-/* Member order detail page (依圖 08) */
+/* Order detail pages (會員依圖 08、團主依圖 26)
+   兩頁都用 od- 前綴，.od-layout／.od-side 是共用的：以前這兩個 class 在本檔
+   前後各定義一次，後面那份無聲覆蓋前面（會員頁的側欄寬度其實一直是團主頁的
+   22rem），所以合併成這一份，兩頁的側欄版面就是同一組值。 */
 .od-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
-  gap: 1.5rem;
+  grid-template-columns: minmax(0, 1fr) 22rem;
+  gap: 1.25rem;
   align-items: start;
 }
 
@@ -2376,6 +2393,11 @@
   .od-layout {
     grid-template-columns: 1fr;
   }
+}
+
+.od-main,
+.od-side {
+  min-width: 0;
 }
 
 .od-side {
@@ -3112,12 +3134,27 @@
 
 .oc-row .label {
   color: var(--color-text-muted);
+  /* 值太長時（例如 Facebook 網址）要讓值換行，不能把標籤擠成一個字一行 */
+  flex-shrink: 0;
 }
 
 .oc-row .value {
   margin-left: auto;
   font-weight: 600;
   text-align: right;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* 聯絡方式的名稱超連結（Facebook 一律以名稱代替網址顯示） */
+.oc-contact-link {
+  color: var(--color-primary);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.oc-contact-link:hover {
+  text-decoration: underline;
 }
 
 .oc-leader-btn {
@@ -3161,6 +3198,17 @@
 
 .oc-contact-value.empty {
   color: var(--color-text-muted);
+}
+
+/* Facebook 的值是可點的名稱連結，與純文字的 ID 區分 */
+a.oc-contact-value {
+  color: var(--color-primary);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+a.oc-contact-value:hover {
+  text-decoration: underline;
 }
 
 .oc-contact-hint {
@@ -3304,8 +3352,6 @@
 .fav-bar-sort select {
   width: auto;
   min-width: 12.5rem;
-  font-size: 0.9rem;
-  padding: 0.5rem 0.7rem;
 }
 
 .fav-grid {
@@ -5364,9 +5410,25 @@
   color: #15803d;
 }
 
-.adm-app-points .warn .adm-app-point-icon {
+/* neutral＝僅陳述現況（灰色減號）；warn＝真的需要注意（橘色） */
+.adm-app-points .neutral .adm-app-point-icon {
   background-color: #f3f3f8;
   color: var(--color-text-muted);
+}
+
+.adm-app-points .warn .adm-app-point-icon {
+  background-color: #fef3c7;
+  color: #b45309;
+}
+
+/* 拒絕申請：紅框白底（依參考圖 31），不是紅底實心 */
+.adm-app-reject {
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+}
+
+.adm-app-reject:hover {
+  background-color: #fef2f2;
 }
 
 .adm-app-point-icon svg {
@@ -6051,15 +6113,6 @@ a.glp-activity:hover {
 /* ---------------------------------------------------------------------------
    團主儀表板「目前開團」（依圖 20）：依活動分組，活動底下每輪開團一列
 ---------------------------------------------------------------------------- */
-.gb-sort select {
-  padding: 0.5rem 0.75rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  background-color: var(--color-surface);
-  color: var(--color-text);
-  font-size: 0.85rem;
-}
-
 .gb-activity-list {
   display: flex;
   flex-direction: column;
@@ -6400,15 +6453,6 @@ a.glp-activity:hover {
   gap: 0.5rem;
   font-size: 0.85rem;
   color: var(--color-text-muted);
-}
-
-.gbl-page-size select {
-  padding: 0.4rem 0.6rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  background-color: var(--color-surface);
-  color: var(--color-text);
-  font-size: 0.85rem;
 }
 
 @media (max-width: 1023px) {
@@ -6796,6 +6840,15 @@ a.glp-activity:hover {
   color: var(--color-text);
 }
 
+/* 開團規則是整張卡片唯一的欄位，要撐滿卡片；上面那組共用規則刻意不設 width，
+   漏了這裡就會縮成瀏覽器預設的 20 字元寬，看起來像卡片角落的一個小方塊。 */
+.gbe-rules-input {
+  width: 100%;
+  min-height: 12rem;
+  line-height: 1.8;
+  resize: vertical;
+}
+
 .gbe-rules {
   margin: 0;
   padding-left: 1.25rem;
@@ -6850,11 +6903,27 @@ a.glp-activity:hover {
 }
 
 /* 多角色商品的每角色庫存，附在商品名稱下方 */
-.gbe-character-stock {
+/* 多角色商品的「已訂購」與「接單上限」逐角色一行；兩欄各行等高才會左右對齊，
+   所以每列固定 min-height（純文字那欄沒有輸入框，行高會比較矮）。 */
+.gbe-qty-stack {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.15rem 0.6rem;
-  margin-top: 0.2rem;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.gbe-qty-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.5rem;
+  font-size: 0.85rem;
+}
+
+.gbe-qty-name {
+  color: var(--color-text-muted);
+}
+
+.gbe-qty-total {
   font-size: 0.75rem;
   color: var(--color-text-muted);
 }
@@ -6876,12 +6945,11 @@ a.glp-activity:hover {
   margin-bottom: 1rem;
 }
 
-/* 全站只有 .form-field 底下的表單元件有樣式，這兩張卡用的是裸 input/select/textarea，
-   在此補齊外觀（刻意不設 width，寬度仍由各處自行控制） */
-.gbc-card select,
+/* 全站只有 .form-field 底下的表單元件有樣式，這兩張卡用的是裸 input/textarea，
+   在此補齊外觀（刻意不設 width，寬度仍由各處自行控制）。
+   select 不列在這裡：它的外觀一律走 global.css 的全站下拉基準。 */
 .gbc-card textarea,
 .gbc-card input:not([type="radio"]):not([type="checkbox"]),
-.gbe-card select,
 .gbe-card textarea,
 .gbe-card input:not([type="radio"]):not([type="checkbox"]) {
   padding: 0.55rem 0.75rem;
@@ -6953,8 +7021,6 @@ a.glp-activity:hover {
 
 .gbc-activity select {
   width: 100%;
-  height: 2.9rem;
-  font-size: 0.95rem;
 }
 
 @media (max-width: 767px) {
@@ -7393,13 +7459,6 @@ a.glp-activity:hover {
 
 .ol-activity-select,
 .ol-sort-select {
-  padding: 0.5rem 0.75rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  background-color: var(--color-surface);
-  color: var(--color-text);
-  font-size: 0.85rem;
-  font-family: inherit;
   max-width: 12rem;
 }
 
@@ -7575,17 +7634,7 @@ a.glp-activity:hover {
   border-width: 2px;
 }
 
-.od-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 22rem;
-  gap: 1.25rem;
-  align-items: start;
-}
-
-.od-main,
-.od-side {
-  min-width: 0;
-}
+/* .od-layout／.od-side／.od-main 與會員訂單詳情頁共用，定義在本檔前段（圖 08 區塊） */
 
 /* 基本資訊／開團資訊的欄位清單：標籤配 icon，值靠左 */
 .od-info {
@@ -7764,6 +7813,17 @@ a.glp-activity:hover {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Facebook 的值是可點的會員名稱，要跟純文字的 ID 區分開來 */
+a.od-contact-value {
+  color: var(--color-primary);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+a.od-contact-value:hover {
+  text-decoration: underline;
 }
 
 .od-contact-action {
@@ -7965,6 +8025,589 @@ a.glp-activity:hover {
   margin: 0 0.3rem;
 }
 
+/* ===== 商品批次新增（使用者 2026-07-30 需求） ===== */
+
+.pb-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.pb-activity {
+  padding: 1.25rem 1.5rem 0.75rem;
+}
+
+.pb-item {
+  padding: 1.25rem 1.5rem;
+}
+
+/* 已建立的項目降低視覺重量，失敗的用紅框標出來 */
+.pb-item.is-done {
+  background-color: var(--color-bg);
+  border-color: #a7f3d0;
+}
+
+.pb-item.is-error {
+  border-color: var(--color-danger);
+}
+
+.pb-item-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.9rem;
+}
+
+.pb-item-head h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  font-size: 1rem;
+}
+
+.pb-done-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #047857;
+}
+
+.pb-done-tag svg {
+  width: 0.95rem;
+  height: 0.95rem;
+}
+
+.pb-done-note {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.pb-remove-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.3rem 0.65rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background-color: var(--color-surface);
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.pb-remove-btn:hover {
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+}
+
+.pb-remove-btn svg {
+  width: 0.9rem;
+  height: 0.9rem;
+}
+
+.pb-item-body {
+  display: grid;
+  grid-template-columns: minmax(180px, 240px) minmax(0, 1fr);
+  gap: 1.25rem;
+  align-items: start;
+}
+
+@media (max-width: 767px) {
+  .pb-item-body {
+    grid-template-columns: 1fr;
+  }
+}
+
+.pb-image-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+/* 商品編輯頁的主圖預覽，同樣用 contain（商品圖為自由比例） */
+.pf-product-preview {
+  width: 10rem;
+  height: 8rem;
+  object-fit: contain;
+  background-color: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  margin-bottom: 0.5rem;
+}
+
+/* 商品圖是自由比例：預覽用 contain 而非 cover，否則管理員會以為圖被裁掉了。
+   這裡是編輯用預覽，維持固定框高度讓多項商品的卡片對齊。 */
+.pb-image {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: contain;
+  background-color: var(--color-bg);
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+}
+
+.pb-image-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius);
+  background-color: var(--color-bg);
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+}
+
+.pb-image-col .btn svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.pb-fields-col {
+  display: flex;
+  flex-direction: column;
+}
+
+.pb-price-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.pb-price-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+.pb-price-row select {
+  flex-shrink: 0;
+}
+
+.pb-character-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 0.4rem;
+}
+
+.pb-character-tags .char-tag button {
+  margin-left: 0.3rem;
+  border: none;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  font-size: 0.9rem;
+  line-height: 1;
+}
+
+/* 刪除角色（只出現在本次新建的標籤上）：與「移除關聯」的 × 用顏色區分，
+   避免把「從商品移除」誤按成「從資料庫刪除」。 */
+.pb-tag-delete {
+  color: var(--color-danger) !important;
+}
+
+.pb-tag-delete svg {
+  width: 0.8rem;
+  height: 0.8rem;
+  vertical-align: -0.1em;
+}
+
+.pb-suggestions {
+  display: flex;
+  flex-direction: column;
+  margin-top: 0.35rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background-color: var(--color-surface);
+}
+
+.pb-suggestions button {
+  padding: 0.5rem 0.75rem;
+  border: none;
+  background: none;
+  text-align: left;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.pb-suggestions button:hover {
+  background-color: var(--color-bg);
+}
+
+.pb-suggestion-new {
+  color: var(--color-primary);
+  border-top: 1px solid var(--color-border) !important;
+}
+
+.pb-add-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.8rem;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius);
+  background-color: var(--color-surface);
+  color: var(--color-primary);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.pb-add-btn:hover {
+  border-color: var(--color-primary);
+  background-color: #f5f3ff;
+}
+
+.pb-add-btn svg {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.pb-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.6rem;
+}
+
+.pb-progress {
+  margin-right: auto;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+/* ===== 圖 33 活動新增／編輯 ===== */
+
+.af-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.af-header .breadcrumb {
+  margin-top: 0.25rem;
+}
+
+.af-header .btn svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.af-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+  padding: 1.5rem;
+}
+
+/* 字數統計置於欄位右下角（同圖 27／28 的做法） */
+.af-counted {
+  position: relative;
+}
+
+.af-count {
+  position: absolute;
+  right: 0.1rem;
+  bottom: -1.1rem;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  pointer-events: none;
+}
+
+.af-counted {
+  margin-bottom: 0.6rem;
+}
+
+.af-image-hint {
+  margin: 0 0 0.6rem;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.af-image-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.af-image {
+  width: 100%;
+  max-width: 32rem;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+}
+
+.af-image-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  max-width: 32rem;
+  aspect-ratio: 16 / 9;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius);
+  background-color: var(--color-bg);
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+}
+
+.af-image-preview .btn svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+/* 滿贈與狀態並排（依參考圖） */
+.af-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+}
+
+/* 選項橫向排列（依參考圖 33）。.form-field 是 flex column，
+   所以 radio 必須包在這層橫向容器裡，否則會變成一行一個。 */
+.af-radio-row {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  padding-top: 0.15rem;
+}
+
+.af-radio {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+
+.af-radio input {
+  margin: 0;
+}
+
+.af-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.af-actions .btn svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+/* ===== 圖片裁切（依圖 33 的裁切區樣式） ===== */
+
+.cropper {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+/* 舞台的尺寸由圖片決定（inline-block ＋ fit-content），
+   因此圖片永遠填滿舞台、不會出現留白。 */
+.cropper-stage {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+  line-height: 0;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background-color: var(--color-bg);
+  user-select: none;
+}
+
+.cropper-image {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  pointer-events: none;
+}
+
+/* 裁切框：框內保持原樣，框外用超大 box-shadow 壓暗，
+   比疊四個遮罩 div 簡單，且框移動時不需要重算遮罩位置。 */
+.cropper-window {
+  position: absolute;
+  box-sizing: border-box;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 9999px rgb(15 23 42 / 55%);
+  cursor: grab;
+  touch-action: none;
+  /* 三分格線協助構圖 */
+  background-image:
+    linear-gradient(to right, rgb(255 255 255 / 30%) 1px, transparent 1px),
+    linear-gradient(to bottom, rgb(255 255 255 / 30%) 1px, transparent 1px);
+  background-size: 33.333% 33.333%;
+}
+
+.cropper-window:active {
+  cursor: grabbing;
+}
+
+.cropper-ratio-tag {
+  position: absolute;
+  top: 0.35rem;
+  left: 0.35rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 6px;
+  background-color: rgb(15 23 42 / 75%);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.5;
+  pointer-events: none;
+}
+
+/* 四角控制點：拖曳改變裁切範圍。做得比視覺尺寸大一些（padding 撐開觸控區），
+   否則在觸控裝置上很難抓到。 */
+.cropper-handle {
+  position: absolute;
+  width: 0.95rem;
+  height: 0.95rem;
+  background-color: #fff;
+  border: 2px solid var(--color-primary);
+  border-radius: 3px;
+  touch-action: none;
+}
+
+.cropper-handle.is-nw {
+  top: -0.5rem;
+  left: -0.5rem;
+  cursor: nwse-resize;
+}
+
+.cropper-handle.is-ne {
+  top: -0.5rem;
+  right: -0.5rem;
+  cursor: nesw-resize;
+}
+
+.cropper-handle.is-sw {
+  bottom: -0.5rem;
+  left: -0.5rem;
+  cursor: nesw-resize;
+}
+
+.cropper-handle.is-se {
+  bottom: -0.5rem;
+  right: -0.5rem;
+  cursor: nwse-resize;
+}
+
+/* 圓形裁切（頭像）時角落控制點也做成圓的，與框的形狀一致 */
+.cropper.is-round .cropper-handle {
+  border-radius: 50%;
+}
+
+/* 頭像等 1:1 情境：裁切框以圓形呈現，讓使用者看得出實際可見範圍 */
+.cropper.is-round .cropper-window {
+  border-radius: 50%;
+  background-image: none;
+}
+
+.cropper-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background-color: var(--color-bg);
+}
+
+.cropper-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.cropper-zoom {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+
+.cropper-zoom input[type="range"] {
+  width: 9rem;
+  accent-color: var(--color-primary);
+}
+
+.cropper-zoom-btn {
+  width: 1.75rem;
+  height: 1.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+  background-color: var(--color-surface);
+  color: var(--color-text);
+  font-size: 0.95rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.cropper-zoom-btn:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.cropper-zoom-value {
+  min-width: 3rem;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  text-align: right;
+}
+
+.cropper-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.cropper-text-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background-color: var(--color-surface);
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.cropper-text-btn:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.cropper-text-btn svg {
+  width: 0.9rem;
+  height: 0.9rem;
+}
+
+.cropper-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+}
+
 /* ===== 圖 28 團主資料管理 ===== */
 
 /* 左寬右窄兩欄；右欄的預設團規卡在窄視窗改為堆疊在下方 */
@@ -8018,15 +8661,18 @@ a.glp-activity:hover {
   text-align: center;
 }
 
-.glp-avatar {
+/* 限定在 .glp-avatar-box 之下：這兩個 class 名與團主公開頁相同，不限範圍的話
+   會覆蓋掉公開頁那顆 9rem／白框陰影的大頭像（同名規則、後定義者勝）。 */
+.glp-avatar-box .glp-avatar {
   width: 8rem;
   height: 8rem;
   border-radius: 50%;
   object-fit: cover;
   border: 3px solid #e0e7ff;
+  box-shadow: none;
 }
 
-.glp-avatar-fallback {
+.glp-avatar-box .glp-avatar-fallback {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -8147,10 +8793,8 @@ a.glp-activity:hover {
   pointer-events: none;
 }
 
-.glp-contacts {
-  padding-top: 1.25rem;
-}
-
+/* .glp-contacts 的間距一律沿用團主公開頁那份定義（L5580），這裡不再覆寫，
+   否則兩頁同名規則會互相影響。 */
 .glp-section-sub {
   margin-left: 0.4rem;
   font-size: 0.8rem;
@@ -8173,7 +8817,7 @@ a.glp-activity:hover {
   border-color: var(--color-primary);
 }
 
-.glp-contact-label {
+.glp-contact-row-label {
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
@@ -8186,7 +8830,7 @@ a.glp-activity:hover {
   font-weight: 600;
 }
 
-.glp-contact-label svg {
+.glp-contact-row-label svg {
   width: 1.15rem;
   height: 1.15rem;
   flex-shrink: 0;

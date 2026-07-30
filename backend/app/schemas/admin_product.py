@@ -93,6 +93,10 @@ class ProductAdminDetailResponse(BaseModel):
     name: str
     official_price: Money | None
     official_currency: Currency | None
+    # 同活動「其他」商品已在使用的幣別（排除自己）。同一活動幣別必須一致，
+    # 前端據此把幣別欄位設為唯讀，而不是讓管理員改到送出才被擋。
+    # 排除自己是關鍵：活動內唯一的標價商品若不排除，會被自己的舊值鎖死。
+    activity_currency: Currency | None = None
     primary_image_url: str
     is_active: bool
     activity: ProductAdminActivityRef

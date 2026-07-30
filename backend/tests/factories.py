@@ -160,6 +160,7 @@ def create_order_with_item(
     *,
     status: OrderStatus = OrderStatus.PAID,
     created_at: datetime | None = None,
+    chosen_character: Character | None = None,
 ) -> GroupOrder:
     """建立一張含單一商品的訂單。
 
@@ -196,6 +197,9 @@ def create_order_with_item(
         unit_price=group_buy_product.unit_price,
         quantity=quantity,
         subtotal=group_buy_product.unit_price * quantity,
+        # 多角色商品要指定角色，否則分角色佔用量查不到這筆
+        chosen_character_id=chosen_character.id if chosen_character else None,
+        chosen_character_name_snapshot=chosen_character.name if chosen_character else None,
     )
     db.add(order_item)
     db.commit()

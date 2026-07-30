@@ -5,11 +5,17 @@ export default function ProductGallery({ images, alt }) {
   const [activeIndex, setActiveIndex] = useState(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const touchStartX = useRef(null);
+  const thumbsRef = useRef(null);
 
   const count = images.length;
 
   function goTo(index) {
     setActiveIndex((index + count) % count);
+  }
+
+  /** 縮圖列左右捲動。商品圖片可能很多，一次捲一個縮圖寬度左右的距離。 */
+  function scrollThumbs(direction) {
+    thumbsRef.current?.scrollBy({ left: direction * 180, behavior: "smooth" });
   }
 
   function handleTouchStart(event) {
@@ -60,16 +66,34 @@ export default function ProductGallery({ images, alt }) {
       </div>
 
       {count > 1 && (
-        <div className="gallery-thumbs">
-          {images.map((image, index) => (
-            <img
-              key={image + index}
-              src={image}
-              alt={`${alt} 縮圖 ${index + 1}`}
-              className={index === activeIndex ? "active" : ""}
-              onClick={() => goTo(index)}
-            />
-          ))}
+        <div className="gallery-thumbs-wrap">
+          <button
+            type="button"
+            className="gallery-thumb-nav"
+            aria-label="縮圖往左"
+            onClick={() => scrollThumbs(-1)}
+          >
+            ‹
+          </button>
+          <div className="gallery-thumbs" ref={thumbsRef}>
+            {images.map((image, index) => (
+              <img
+                key={image + index}
+                src={image}
+                alt={`${alt} 縮圖 ${index + 1}`}
+                className={index === activeIndex ? "active" : ""}
+                onClick={() => goTo(index)}
+              />
+            ))}
+          </div>
+          <button
+            type="button"
+            className="gallery-thumb-nav"
+            aria-label="縮圖往右"
+            onClick={() => scrollThumbs(1)}
+          >
+            ›
+          </button>
         </div>
       )}
 

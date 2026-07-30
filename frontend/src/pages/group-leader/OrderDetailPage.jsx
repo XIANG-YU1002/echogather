@@ -20,6 +20,7 @@ import Alert from "../../components/common/Alert.jsx";
 import Breadcrumb from "../../components/common/Breadcrumb.jsx";
 import Button from "../../components/common/Button.jsx";
 import ConfirmModal from "../../components/common/ConfirmModal.jsx";
+import ContactValue, { facebookHref } from "../../components/common/ContactValue.jsx";
 import ErrorState from "../../components/common/ErrorState.jsx";
 import PageLoader from "../../components/common/PageLoader.jsx";
 import StatusBadge from "../../components/common/StatusBadge.jsx";
@@ -75,7 +76,7 @@ function formatDateTime(isoString) {
 }
 
 /** 會員聯絡方式小卡。Facebook 已強制為連結，可直接開啟；其餘提供複製。 */
-function ContactCard({ platform, value }) {
+function ContactCard({ platform, value, displayName }) {
   const [copied, setCopied] = useState(false);
   const Icon = { facebook: FacebookIcon, discord: DiscordIcon, line: LineIcon }[platform];
 
@@ -89,16 +90,23 @@ function ContactCard({ platform, value }) {
     }
   }
 
-  const href = value.startsWith("http") ? value : `https://${value}`;
+  // 用共用判定：舊寫法對非網址的值也會硬拼成 https://xxx，開出來是壞連結
+  const href = platform === "facebook" ? facebookHref(value) : null;
 
   return (
     <div className="od-contact">
       <Icon className="od-contact-icon" />
       <span className="od-contact-text">
         <span className="od-contact-platform">{CONTACT_PLATFORM_LABELS[platform]}</span>
-        <span className="od-contact-value">{value}</span>
+        {/* Facebook 存的是網址，直接印會撐破小卡；顯示成會員暱稱的超連結 */}
+        <ContactValue
+          platform={platform}
+          value={value}
+          displayName={displayName}
+          className="od-contact-value"
+        />
       </span>
-      {platform === "facebook" ? (
+      {href ? (
         <a className="od-contact-action" href={href} target="_blank" rel="noreferrer noopener">
           查看個人檔案 ↗
         </a>
@@ -506,7 +514,12 @@ export default function OrderDetailPage() {
             ) : (
               <div className="od-contacts">
                 {contacts.map(([platform, value]) => (
-                  <ContactCard key={platform} platform={platform} value={value} />
+                  <ContactCard
+                    key={platform}
+                    platform={platform}
+                    value={value}
+                    displayName={order.member_nickname}
+                  />
                 ))}
               </div>
             )}

@@ -10,6 +10,7 @@ import { ApiError, resolveMediaUrl } from "../../api/client.js";
 import Alert from "../../components/common/Alert.jsx";
 import Button from "../../components/common/Button.jsx";
 import ConfirmModal from "../../components/common/ConfirmModal.jsx";
+import ContactValue from "../../components/common/ContactValue.jsx";
 import ErrorState from "../../components/common/ErrorState.jsx";
 import PageLoader from "../../components/common/PageLoader.jsx";
 import StatusBadge from "../../components/common/StatusBadge.jsx";
@@ -21,7 +22,8 @@ import {
   DiscordIcon,
   FacebookIcon,
   LineIcon,
-  MailIcon,
+  MinusCircleIcon,
+  XCircleIcon,
 } from "../../components/common/icons.jsx";
 
 const CONTACT_FIELDS = [
@@ -107,10 +109,11 @@ export default function GroupLeaderApplicationDetailPage() {
   const isPending = application.status === "pending";
   const filledContacts = CONTACT_FIELDS.filter((contact) => user[contact.key]);
 
-  // 審核重點只列出系統真的查得到的事實（平台沒有帳號停權／異常紀錄機制）
+  // 審核重點只列出系統真的查得到的事實（平台沒有帳號停權／異常紀錄機制）。
+  // tone：ok＝綠勾（條件成立）、neutral＝灰色減號（僅陳述現況，非好壞判斷，依參考圖 31）
   const reviewPoints = [
     {
-      ok: filledContacts.length > 0,
+      tone: filledContacts.length > 0 ? "ok" : "warn",
       title: filledContacts.length > 0 ? "聯絡方式已提供" : "尚未提供聯絡方式",
       detail:
         filledContacts.length > 0
@@ -118,17 +121,17 @@ export default function GroupLeaderApplicationDetailPage() {
           : "此會員尚未填寫任何外部聯絡方式，核准後將無法聯繫。",
     },
     {
-      ok: isPending,
+      tone: isPending ? "ok" : "neutral",
       title: isPending ? "尚未有其他待審核申請" : "此申請已完成審核",
       detail: isPending
         ? "同一會員同時只能有一筆待審核申請，此為目前唯一待審件。"
         : `審核時間：${application.reviewed_at ? formatDateTime(application.reviewed_at) : "—"}`,
     },
     {
-      ok: isPending,
+      tone: "neutral",
       title: isPending ? "尚未具有團主資格" : "已完成資格處理",
       detail: isPending
-        ? "系統查無團主資格紀錄，可進行審核。"
+        ? "系統查無團主資格紀錄，可申請。"
         : "此會員的團主資格已依審核結果處理。",
     },
   ];
@@ -180,17 +183,22 @@ export default function GroupLeaderApplicationDetailPage() {
                 <li key={contact.key}>
                   <Icon />
                   <span className="adm-app-contact-label">{contact.label}</span>
-                  <span className={value ? "" : "adm-app-contact-empty"}>
-                    {value || "未設定"}
-                  </span>
+                  {/* Facebook 存的是網址，直接印會撐破這一列 */}
+                  {value && contact.key === "facebook_contact" ? (
+                    <ContactValue
+                      platform="facebook"
+                      value={value}
+                      displayName={user.nickname}
+                      className="oc-contact-link"
+                    />
+                  ) : (
+                    <span className={value ? "" : "adm-app-contact-empty"}>
+                      {value || "未設定"}
+                    </span>
+                  )}
                 </li>
               );
             })}
-            <li>
-              <MailIcon />
-              <span className="adm-app-contact-label">Email</span>
-              <span>{user.email}</span>
-            </li>
           </ul>
         </div>
       </div>
@@ -217,9 +225,9 @@ export default function GroupLeaderApplicationDetailPage() {
           <h2 className="adm-app-section">審核重點</h2>
           <ul className="adm-app-points">
             {reviewPoints.map((point) => (
-              <li key={point.title} className={point.ok ? "ok" : "warn"}>
+              <li key={point.title} className={point.tone}>
                 <span className="adm-app-point-icon">
-                  {point.ok ? <CheckCircleIcon /> : <CheckIcon />}
+                  {point.tone === "ok" ? <CheckCircleIcon /> : <MinusCircleIcon />}
                 </span>
                 <div>
                   <strong>{point.title}</strong>
@@ -241,7 +249,15 @@ export default function GroupLeaderApplicationDetailPage() {
                 <CheckIcon />
                 核准申請
               </Button>
-              <Button variant="danger" loading={busy} onClick={() => setConfirming("reject")}>
+              {/* 依參考圖 31，拒絕是紅框白底（不是紅底實心）：
+                  兩顆並排時實心紅過於搶眼，核准才是主要動作 */}
+              <Button
+                variant="secondary"
+                className="adm-app-reject"
+                loading={busy}
+                onClick={() => setConfirming("reject")}
+              >
+                <XCircleIcon />
                 拒絕申請
               </Button>
             </div>

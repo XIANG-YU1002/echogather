@@ -158,7 +158,11 @@ export default function ProductListPage() {
           <option value="true">已上架</option>
           <option value="false">已下架</option>
         </select>
-        <Link className="btn btn-primary admin-toolbar-action" to="/admin/products/new">
+        {/* 已篩選活動時把活動帶進新增頁，省掉再選一次（使用者 2026-07-30 要求） */}
+        <Link
+          className="btn btn-primary admin-toolbar-action"
+          to={activityId ? `/admin/products/new?activity_id=${activityId}` : "/admin/products/new"}
+        >
           + 新增商品
         </Link>
       </div>

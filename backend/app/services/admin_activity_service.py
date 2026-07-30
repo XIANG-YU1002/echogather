@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from app.core.errors import AppError
 from app.models.activity import Activity
 from app.models.enums import ActivityStatus
-from app.repositories import activity_repository
+from app.repositories import activity_repository, product_repository
 from app.schemas.admin_activity import (
     ActivityAdminDetailResponse,
     ActivityAdminListItem,
@@ -31,6 +31,8 @@ def _to_detail(db: Session, activity: Activity) -> ActivityAdminDetailResponse:
         has_full_gift=activity.has_full_gift,
         product_count=activity_repository.count_products_for_activity(db, activity.id),
         group_buy_count=activity_repository.count_group_buys_for_activity(db, activity.id),
+        # 供前端鎖定商品幣別用（同一活動必須一致）
+        product_currency=product_repository.get_activity_currency(db, activity.id),
         created_at=activity.created_at,
         updated_at=activity.updated_at,
     )

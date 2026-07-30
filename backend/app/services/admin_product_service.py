@@ -54,6 +54,10 @@ def _to_detail(db: Session, product: Product) -> ProductAdminDetailResponse:
         name=product.name,
         official_price=product.official_price,
         official_currency=product.official_currency,
+        # 排除自己：供前端判斷幣別能不能改（同活動必須一致）
+        activity_currency=product_repository.get_activity_currency(
+            db, product.activity_id, exclude_product_id=product.id
+        ),
         primary_image_url=product.primary_image_url,
         is_active=product.is_active,
         activity=ProductAdminActivityRef.model_validate(activity, from_attributes=True),
@@ -68,8 +72,37 @@ def _to_detail(db: Session, product: Product) -> ProductAdminDetailResponse:
     )
 
 
+def _validate_activity_currency(
+    db: Session,
+    activity_id: uuid.UUID,
+    official_currency: Currency | None,
+    *,
+    exclude_product_id: uuid.UUID | None = None,
+) -> None:
+    """同一活動的商品幣別必須一致（使用者 2026-07-30 規則）。
+
+    在後端驗證而不只靠前端限制：同一活動的商品可能由不同管理員、不同時間建立，
+    只有這裡擋得住「有的台幣有的日圓」的資料。
+    """
+    if official_currency is None:
+        return
+    existing = product_repository.get_activity_currency(
+        db, activity_id, exclude_product_id=exclude_product_id
+    )
+    if existing is not None and existing != official_currency:
+        raise AppError(
+            409,
+            "ACTIVITY_CURRENCY_MISMATCH",
+            f"此活動的商品幣別為 {existing}，同一活動內必須使用相同幣別。",
+            {"activity_currency": existing, "provided_currency": official_currency},
+        )
+
+
 def create_product(db: Session, payload: CreateProductRequest) -> ProductAdminDetailResponse:
-    """依 Business Rules §11.2/§11.3：商品必須屬於活動、同活動內名稱不可重複、價格固定 TWD。"""
+    """依 Business Rules §11.2/§11.3：商品必須屬於活動、同活動內名稱不可重複。
+
+    幣別另依使用者 2026-07-30 規則：同一活動內必須一致。
+    """
     activity = activity_repository.get_by_id(db, payload.activity_id)
     if activity is None:
         raise AppError(404, "ACTIVITY_NOT_FOUND", "找不到指定的活動。")
@@ -79,6 +112,7 @@ def create_product(db: Session, payload: CreateProductRequest) -> ProductAdminDe
     official_currency = (
         (payload.official_currency or Currency.TWD) if payload.official_price is not None else None
     )
+    _validate_activity_currency(db, activity.id, official_currency)
 
     product = product_repository.create_product(
         db,
@@ -158,12 +192,17 @@ def update_product(
         product.name = payload.name
 
     if "official_price" in provided:
-        product.official_price = payload.official_price
-        product.official_currency = (
+        next_currency = (
             (payload.official_currency or Currency.TWD)
             if payload.official_price is not None
             else None
         )
+        # 排除自己：改成與其他商品一致的幣別要放行，不能被自己的舊值擋住
+        _validate_activity_currency(
+            db, product.activity_id, next_currency, exclude_product_id=product.id
+        )
+        product.official_price = payload.official_price
+        product.official_currency = next_currency
 
     if "primary_image_url" in provided:
         product.primary_image_url = payload.primary_image_url

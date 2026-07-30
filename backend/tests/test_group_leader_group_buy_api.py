@@ -1,14 +1,17 @@
 from datetime import datetime, timedelta, timezone
 
 from app.models.enums import OrderStatus
+from app.models.group_buy import GroupBuyProductCharacter
 from tests.factories import (
     create_activity,
+    create_character,
     create_group_buy,
     create_group_buy_product,
     create_group_leader_profile,
     create_order_with_item,
     create_product,
     create_user,
+    link_product_character,
 )
 from tests.utils import auth_headers, login
 
@@ -560,3 +563,185 @@ def test_close_group_buy_then_cannot_close_again(client, db_session):
     )
     assert second_response.status_code == 409
     assert second_response.json()["error"]["code"] == "GROUP_BUY_ALREADY_CLOSED"
+
+
+# ---------------------------------------------------------------------------
+# 每角色接單上限（Business Rules §20.4）
+# 單商品多角色時，團主可把不接的角色設 0；商品層級與單一角色仍須至少 1。
+# ---------------------------------------------------------------------------
+
+
+def _multi_character_product(db_session, activity, count=2):
+    """建立一個掛了 count 個角色的商品，回傳 (product, characters)。"""
+    product = create_product(db_session, activity=activity)
+    characters = [create_character(db_session) for _ in range(count)]
+    for character in characters:
+        link_product_character(db_session, product, character)
+    return product, characters
+
+
+def _character_payload(product, activity, quantities):
+    """quantities 依角色順序給定每角色上限。"""
+    return _base_payload(
+        product.id,
+        activity_id=str(activity.id),
+        products=[
+            {
+                "product_id": str(product.id),
+                "unit_price": "100.00",
+                # 商品層級送總和，與後端加總後的值一致
+                "max_quantity": max(sum(qty for _, qty in quantities), 1),
+                "character_quantities": [
+                    {"character_id": str(character.id), "max_quantity": qty}
+                    for character, qty in quantities
+                ],
+            }
+        ],
+    )
+
+
+def test_create_group_buy_character_quantity_zero_means_not_accepting(client, db_session):
+    """某個角色設 0：開團建立成功，該角色可用量 0，商品總上限只算其他角色。"""
+    activity = create_activity(db_session)
+    product, characters = _multi_character_product(db_session, activity)
+    headers = _leader(client, db_session)
+
+    payload = _character_payload(product, activity, [(characters[0], 3), (characters[1], 0)])
+    response = client.post("/api/v1/group-leader/group-buys", json=payload, headers=headers)
+
+    assert response.status_code == 201
+    item = response.json()["data"]["products"][0]
+    assert item["max_quantity"] == 3
+    stock = {entry["name"]: entry for entry in item["character_stock"]}
+    assert stock[characters[0].name]["available_quantity"] == 3
+    assert stock[characters[1].name]["max_quantity"] == 0
+    assert stock[characters[1].name]["available_quantity"] == 0
+
+
+def test_create_group_buy_single_character_quantity_zero_rejected(client, db_session):
+    """只有一個角色的商品填 0 等於整個商品不接，應該取消勾選而不是填 0。"""
+    activity = create_activity(db_session)
+    product, characters = _multi_character_product(db_session, activity, count=1)
+    headers = _leader(client, db_session)
+
+    payload = _character_payload(product, activity, [(characters[0], 0)])
+    response = client.post("/api/v1/group-leader/group-buys", json=payload, headers=headers)
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "SINGLE_CHARACTER_QUANTITY_ZERO"
+
+
+def test_create_group_buy_all_character_quantities_zero_rejected(client, db_session):
+    activity = create_activity(db_session)
+    product, characters = _multi_character_product(db_session, activity)
+    headers = _leader(client, db_session)
+
+    payload = _character_payload(product, activity, [(characters[0], 0), (characters[1], 0)])
+    response = client.post("/api/v1/group-leader/group-buys", json=payload, headers=headers)
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "ALL_CHARACTER_QUANTITIES_ZERO"
+
+
+def test_create_group_buy_product_max_quantity_zero_rejected(client, db_session):
+    """商品層級的上限不放寬：勾選商品就代表要接單。"""
+    activity = create_activity(db_session)
+    product = create_product(db_session, activity=activity)
+    headers = _leader(client, db_session)
+
+    payload = _base_payload(
+        product.id,
+        activity_id=str(activity.id),
+        products=[{"product_id": str(product.id), "unit_price": "100.00", "max_quantity": 0}],
+    )
+    response = client.post("/api/v1/group-leader/group-buys", json=payload, headers=headers)
+
+    assert response.status_code == 422
+
+
+def test_update_character_quantity_to_zero_stops_accepting(client, db_session):
+    """開團後把某角色改成 0：該角色不再可跟，其他角色不受影響。"""
+    activity = create_activity(db_session)
+    product, characters = _multi_character_product(db_session, activity)
+    headers = _leader(client, db_session)
+
+    created = client.post(
+        "/api/v1/group-leader/group-buys",
+        json=_character_payload(product, activity, [(characters[0], 4), (characters[1], 4)]),
+        headers=headers,
+    ).json()["data"]
+    group_buy_id = created["id"]
+    group_buy_product_id = created["products"][0]["id"]
+
+    response = client.patch(
+        f"/api/v1/group-leader/group-buys/{group_buy_id}/products/{group_buy_product_id}",
+        json={
+            "character_quantities": [
+                {"character_id": str(characters[0].id), "max_quantity": 4},
+                {"character_id": str(characters[1].id), "max_quantity": 0},
+            ]
+        },
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+    item = response.json()["data"]["products"][0]
+    assert item["max_quantity"] == 4
+    stock = {entry["name"]: entry for entry in item["character_stock"]}
+    assert stock[characters[1].name]["max_quantity"] == 0
+    assert stock[characters[0].name]["available_quantity"] == 4
+
+
+def test_update_character_quantity_below_occupied_rejected(client, db_session):
+    """已被訂單占用的角色不能調到占用量以下（與商品層級同一條規則）。"""
+    activity = create_activity(db_session)
+    product, characters = _multi_character_product(db_session, activity)
+    leader_user = create_user(db_session)
+    profile = create_group_leader_profile(db_session, user=leader_user, complete=True)
+    token = login(client, leader_user.email, "Passw0rd1")
+    headers = auth_headers(token)
+
+    group_buy = create_group_buy(db_session, group_leader_profile=profile, activity=activity)
+    group_buy_product = create_group_buy_product(
+        db_session, group_buy=group_buy, product=product, max_quantity=6
+    )
+    db_session.add_all(
+        [
+            GroupBuyProductCharacter(
+                group_buy_product_id=group_buy_product.id,
+                character_id=characters[0].id,
+                max_quantity=3,
+            ),
+            GroupBuyProductCharacter(
+                group_buy_product_id=group_buy_product.id,
+                character_id=characters[1].id,
+                max_quantity=3,
+            ),
+        ]
+    )
+    db_session.commit()
+
+    member = create_user(db_session)
+    create_order_with_item(
+        db_session,
+        user=member,
+        group_buy=group_buy,
+        group_buy_product=group_buy_product,
+        quantity=2,
+        chosen_character=characters[0],
+    )
+
+    response = client.patch(
+        f"/api/v1/group-leader/group-buys/{group_buy.id}/products/{group_buy_product.id}",
+        json={
+            "character_quantities": [
+                {"character_id": str(characters[0].id), "max_quantity": 0},
+                {"character_id": str(characters[1].id), "max_quantity": 3},
+            ]
+        },
+        headers=headers,
+    )
+
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "CHARACTER_MAX_QUANTITY_BELOW_OCCUPIED"
+    assert response.json()["error"]["details"]["occupied_quantity"] == 2

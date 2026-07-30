@@ -61,6 +61,110 @@ def test_create_product_duplicate_name_in_activity(client, db_session):
     assert response.json()["error"]["code"] == "CONFLICT"
 
 
+def _create_product_via_api(client, headers, activity, name, price, currency):
+    return client.post(
+        "/api/v1/admin/products",
+        json={
+            "activity_id": str(activity.id),
+            "name": name,
+            "official_price": price,
+            "official_currency": currency,
+            "primary_image_url": "/uploads/product/p.webp",
+        },
+        headers=headers,
+    )
+
+
+def test_create_product_rejects_currency_different_from_activity(client, db_session):
+    """同一活動的商品幣別必須一致（使用者 2026-07-30 規則）。"""
+    headers = _admin_headers(client, db_session)
+    activity = create_activity(db_session)
+
+    first = _create_product_via_api(client, headers, activity, "立牌", "390.00", "TWD")
+    assert first.status_code == 201
+
+    second = _create_product_via_api(client, headers, activity, "吊飾", "1500.00", "JPY")
+    assert second.status_code == 409
+    body = second.json()["error"]
+    assert body["code"] == "ACTIVITY_CURRENCY_MISMATCH"
+    # 訊息要告訴管理員該活動目前用的是哪一種幣別，否則不知道要改成什麼
+    assert body["details"]["activity_currency"] == "TWD"
+
+
+def test_create_product_allows_same_currency_and_unpriced(client, db_session):
+    """同幣別可以繼續新增；沒有標價的商品不受幣別限制。"""
+    headers = _admin_headers(client, db_session)
+    activity = create_activity(db_session)
+
+    assert _create_product_via_api(client, headers, activity, "立牌", "390.00", "TWD").status_code == 201
+    assert _create_product_via_api(client, headers, activity, "色紙", "250.00", "TWD").status_code == 201
+
+    # 未填官方價 → official_currency 為 NULL，不構成幣別衝突
+    unpriced = client.post(
+        "/api/v1/admin/products",
+        json={
+            "activity_id": str(activity.id),
+            "name": "無標價商品",
+            "primary_image_url": "/uploads/product/p.webp",
+        },
+        headers=headers,
+    )
+    assert unpriced.status_code == 201
+    assert unpriced.json()["data"]["official_currency"] is None
+
+
+def test_create_product_currency_isolated_per_activity(client, db_session):
+    """限制只在同一活動內；不同活動可以各用不同幣別。"""
+    headers = _admin_headers(client, db_session)
+    activity_a = create_activity(db_session)
+    activity_b = create_activity(db_session)
+
+    assert _create_product_via_api(client, headers, activity_a, "立牌", "390.00", "TWD").status_code == 201
+    assert _create_product_via_api(client, headers, activity_b, "立牌", "1500.00", "JPY").status_code == 201
+
+
+def test_update_product_currency_validated_excluding_itself(client, db_session):
+    """改幣別同樣受限；但排除自己，否則唯一的標價商品會被自己的舊值鎖死。"""
+    headers = _admin_headers(client, db_session)
+    activity = create_activity(db_session)
+
+    created = _create_product_via_api(client, headers, activity, "立牌", "390.00", "TWD")
+    product_id = created.json()["data"]["id"]
+
+    # 全活動只有這一項標價商品 → 改成別的幣別應該可以
+    changed = client.patch(
+        f"/api/v1/admin/products/{product_id}",
+        json={"official_price": "1500.00", "official_currency": "JPY"},
+        headers=headers,
+    )
+    assert changed.status_code == 200
+    assert changed.json()["data"]["official_currency"] == "JPY"
+
+    # 再加一項 JPY 之後，就不能把其中一項改成 TWD
+    assert _create_product_via_api(client, headers, activity, "吊飾", "800.00", "JPY").status_code == 201
+    rejected = client.patch(
+        f"/api/v1/admin/products/{product_id}",
+        json={"official_price": "390.00", "official_currency": "TWD"},
+        headers=headers,
+    )
+    assert rejected.status_code == 409
+    assert rejected.json()["error"]["code"] == "ACTIVITY_CURRENCY_MISMATCH"
+
+
+def test_activity_detail_exposes_product_currency(client, db_session):
+    """前端靠這個欄位鎖定幣別下拉，避免送出才被擋。"""
+    headers = _admin_headers(client, db_session)
+    activity = create_activity(db_session)
+
+    before = client.get(f"/api/v1/admin/activities/{activity.id}", headers=headers)
+    assert before.json()["data"]["product_currency"] is None
+
+    _create_product_via_api(client, headers, activity, "立牌", "390.00", "JPY")
+
+    after = client.get(f"/api/v1/admin/activities/{activity.id}", headers=headers)
+    assert after.json()["data"]["product_currency"] == "JPY"
+
+
 def test_create_product_new_character_reuses_existing_case_insensitive(client, db_session):
     """以 new_name 送出已存在的角色（大小寫不同）時應重用既有角色，不建立第二筆。"""
     headers = _admin_headers(client, db_session)

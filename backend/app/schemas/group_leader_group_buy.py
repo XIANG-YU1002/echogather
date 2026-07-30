@@ -15,12 +15,15 @@ from app.schemas.common import Money, UTCDateTime, normalize_optional_text
 
 class GroupBuyProductCharacterInput(BaseModel):
     character_id: uuid.UUID
-    max_quantity: int = Field(gt=0)
+    # 0＝不接這個角色的單。單商品多角色時，團主可只接部分角色（缺貨或不代購的設 0）。
+    # 「單一角色商品不可為 0」「多角色不可全部為 0」是跨列條件，由 service 驗證。
+    max_quantity: int = Field(ge=0)
 
 
 class GroupBuyProductInput(BaseModel):
     product_id: uuid.UUID
     unit_price: Money = Field(ge=0)
+    # 商品層級上限維持至少 1：勾選商品就代表要接單，完全不接應該取消勾選而不是填 0。
     max_quantity: int = Field(gt=0)
     # 多角色商品的每角色接單上限；未提供時後端以 max_quantity 作為每角色 fallback。
     character_quantities: list[GroupBuyProductCharacterInput] = []

@@ -10,6 +10,7 @@ import Alert from "../../components/common/Alert.jsx";
 import Breadcrumb from "../../components/common/Breadcrumb.jsx";
 import Button from "../../components/common/Button.jsx";
 import ErrorState from "../../components/common/ErrorState.jsx";
+import ContactValue from "../../components/common/ContactValue.jsx";
 import MediaImage from "../../components/common/MediaImage.jsx";
 import PageLoader from "../../components/common/PageLoader.jsx";
 import {
@@ -153,7 +154,18 @@ export default function OrderConfirmPage() {
     { label: "收單期限", value: formatDeadline(groupBuy.deadline_at) },
     {
       label: "團主主要聯絡方式",
-      value: `${CONTACT_PLATFORM_LABELS[groupBuy.contact_platform]}：${groupBuy.contact_value}`,
+      // Facebook 的值是一長串網址，直接印會把左邊的標籤壓成一個字一行
+      value: (
+        <>
+          {CONTACT_PLATFORM_LABELS[groupBuy.contact_platform]}：
+          <ContactValue
+            platform={groupBuy.contact_platform}
+            value={groupBuy.contact_value}
+            displayName={groupBuy.group_leader.display_name}
+            className="oc-contact-link"
+          />
+        </>
+      ),
     },
   ];
 
@@ -261,7 +273,12 @@ export default function OrderConfirmPage() {
                   <Icon className="oc-contact-icon" />
                   <span className="oc-contact-name">{label}</span>
                   {profile[field] ? (
-                    <span className="oc-contact-value">{profile[field]}</span>
+                    <ContactValue
+                      platform={key}
+                      value={profile[field]}
+                      displayName={profile.nickname}
+                      className="oc-contact-value"
+                    />
                   ) : (
                     <span className="oc-contact-value empty">未填寫</span>
                   )}

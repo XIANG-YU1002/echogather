@@ -6,6 +6,7 @@ import { ApiError } from "../../api/client.js";
 import MediaImage from "../../components/common/MediaImage.jsx";
 import Breadcrumb from "../../components/common/Breadcrumb.jsx";
 import Button from "../../components/common/Button.jsx";
+import ContactValue from "../../components/common/ContactValue.jsx";
 import ErrorState from "../../components/common/ErrorState.jsx";
 import PageLoader from "../../components/common/PageLoader.jsx";
 import StatusBadge from "../../components/common/StatusBadge.jsx";
@@ -59,7 +60,8 @@ function formatRemaining(isoString) {
 
 export default function OrderDetailPage() {
   const { orderId } = useParams();
-  const { token } = useAuth();
+  // user 只用來當 Facebook 連結的顯示名稱（訂單快照沒有暱稱欄位）
+  const { token, user } = useAuth();
   const [order, setOrder] = useState(null);
   const [error, setError] = useState(null);
   const [copied, setCopied] = useState(false);
@@ -249,9 +251,16 @@ export default function OrderDetailPage() {
                 <div className="oc-contact-row" key={key}>
                   <Icon className="oc-contact-icon" />
                   <span className="oc-contact-name">{label}</span>
-                  <span className={`oc-contact-value${order[field] ? "" : " empty"}`}>
-                    {order[field] || "未填寫"}
-                  </span>
+                  {order[field] ? (
+                    <ContactValue
+                      platform={key}
+                      value={order[field]}
+                      displayName={user?.nickname}
+                      className="oc-contact-value"
+                    />
+                  ) : (
+                    <span className="oc-contact-value empty">未填寫</span>
+                  )}
                 </div>
               ))}
               <p className="oc-contact-hint">
@@ -488,7 +497,13 @@ export default function OrderDetailPage() {
               <span className="label">主要聯絡方式</span>
               <span className="value od-leader-contact">
                 {LeaderContactIcon && <LeaderContactIcon className="oc-contact-icon" />}
-                {CONTACT_PLATFORM_LABELS[order.contact_platform]}：{order.contact_value}
+                {CONTACT_PLATFORM_LABELS[order.contact_platform]}：
+                <ContactValue
+                  platform={order.contact_platform}
+                  value={order.contact_value}
+                  displayName={order.group_leader_name}
+                  className="oc-contact-link"
+                />
               </span>
             </div>
             <Link

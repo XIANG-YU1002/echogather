@@ -39,6 +39,7 @@ import AdminActivityListPage from "../pages/admin/ActivityListPage.jsx";
 import AdminActivityFormPage from "../pages/admin/ActivityFormPage.jsx";
 import AdminProductListPage from "../pages/admin/ProductListPage.jsx";
 import AdminProductFormPage from "../pages/admin/ProductFormPage.jsx";
+import AdminProductBatchCreatePage from "../pages/admin/ProductBatchCreatePage.jsx";
 import AdminGroupLeaderApplicationListPage from "../pages/admin/GroupLeaderApplicationListPage.jsx";
 import AdminGroupLeaderApplicationDetailPage from "../pages/admin/GroupLeaderApplicationDetailPage.jsx";
 import AdminAnnouncementListPage from "../pages/admin/AnnouncementListPage.jsx";
@@ -100,7 +101,8 @@ export default function AppRoutes() {
         <Route path="/admin/activities/new" element={<AdminActivityFormPage />} />
         <Route path="/admin/activities/:activityId" element={<AdminActivityFormPage />} />
         <Route path="/admin/products" element={<AdminProductListPage />} />
-        <Route path="/admin/products/new" element={<AdminProductFormPage />} />
+        {/* 新增走批次頁（可一次建立多項）；編輯仍是單項表單頁 */}
+        <Route path="/admin/products/new" element={<AdminProductBatchCreatePage />} />
         <Route path="/admin/products/:productId" element={<AdminProductFormPage />} />
         <Route path="/admin/announcements" element={<AdminAnnouncementListPage />} />
       </Route>

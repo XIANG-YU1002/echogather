@@ -2,7 +2,7 @@ import uuid
 
 from pydantic import BaseModel, field_validator, model_validator
 
-from app.models.enums import ActivityStatus
+from app.models.enums import ActivityStatus, Currency
 from app.schemas.common import UTCDateTime, normalize_optional_text
 
 
@@ -73,5 +73,9 @@ class ActivityAdminDetailResponse(BaseModel):
     has_full_gift: bool
     product_count: int
     group_buy_count: int
+    # 此活動的商品已在使用的官方價幣別；還沒有任何標價商品時為 None。
+    # 同一活動的幣別必須一致（使用者 2026-07-30 規則），前端據此把幣別鎖定，
+    # 不必等送出被後端擋下來才知道。
+    product_currency: Currency | None = None
     created_at: UTCDateTime
     updated_at: UTCDateTime

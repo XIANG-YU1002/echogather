@@ -3420,7 +3420,19 @@ POST /api/v1/admin/products
 - 建立新角色及商品關聯
 - 建立商品
 
-商品價格固定為 TWD，不接受幣別欄位。
+> 修訂紀錄：
+> - 2026-07-24 起接受 `official_currency`（TWD／CNY／JPY／KRW／USD），
+>   原本固定 TWD。填了 `official_price` 卻未指定幣別時預設 TWD。
+> - 2026-07-30 起驗證**同一活動的商品幣別必須一致**（Business Rules §11.2a）。
+>   違反時回：
+>
+> ```text
+> 409 ACTIVITY_CURRENCY_MISMATCH
+> details: { activity_currency, provided_currency }
+> ```
+>
+> details 會帶出該活動目前的幣別，管理員才知道要改成什麼。
+> 未填官方價的商品幣別為 NULL，不受此規則限制。
 
 ---
 
@@ -3432,6 +3444,11 @@ GET /api/v1/admin/products/{product_id}
 
 回傳完整商品、活動、額外圖片、關聯角色、開團關聯數及收藏數。
 
+> 新增欄位（2026-07-30）：`activity_currency` —— 同活動**其他**商品已在使用的幣別
+> （已排除本商品自己），沒有其他標價商品時為 null。
+> 前端據此把幣別欄位設為唯讀，而不是讓管理員改到送出才被 §28.2 的驗證擋下來。
+> **排除自己是必要的**：活動內唯一的標價商品若不排除，會被自己的舊幣別鎖死。
+
 ---
 
 # 28.4 Update Product
@@ -3441,6 +3458,9 @@ PATCH /api/v1/admin/products/{product_id}
 ```
 
 可使用與建立相同的 `characters` 結構更新角色關聯，整筆操作使用 Transaction。
+
+幣別同樣受 §11.2a 限制（驗證時排除商品自己），違反時回
+`409 ACTIVITY_CURRENCY_MISMATCH`。
 
 ---
 

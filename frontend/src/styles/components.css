@@ -144,9 +144,9 @@ input[type="checkbox"] {
   margin-left: 0.2rem;
 }
 
+/* select 的外觀走 global.css 的全站基準，這裡只管 input／textarea */
 .form-field input,
-.form-field textarea,
-.form-field select {
+.form-field textarea {
   padding: 0.55rem 0.75rem;
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
@@ -519,16 +519,9 @@ input[type="checkbox"] {
   font-size: 0.85rem;
   color: var(--color-text-muted);
 }
-/* 與團主後台的 .gbl-page-size select 同一種外觀（邊框＋圓角＋白底），
-   否則這裡會是瀏覽器原生下拉，跟站內其他下拉明顯不同。 */
+/* 外觀走 global.css 的全站基準，這裡只需要不要撐滿整列 */
 .page-size-select select {
   width: auto;
-  padding: 0.4rem 0.6rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  background-color: var(--color-surface);
-  color: var(--color-text);
-  font-size: 0.85rem;
 }
 
 /* Platform announcement page (依 35_) */
@@ -710,28 +703,10 @@ input[type="checkbox"] {
   height: 44px;
 }
 
-/* 下拉選單與搜尋框統一格式（同高度、圓角膠囊、邊框、自訂箭頭） */
+/* 外觀走 global.css 的全站基準；這裡只把高度拉到與同列的膠囊搜尋框一致 */
 .admin-toolbar-select {
   flex-shrink: 0;
   height: 44px;
-  border: 1px solid var(--color-border);
-  border-radius: 999px;
-  background-color: var(--color-bg);
-  padding: 0 2.4rem 0 1.1rem;
-  font-size: 0.9rem;
-  color: var(--color-text);
-  cursor: pointer;
-  appearance: none;
-  -webkit-appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239a9aa8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 1rem center;
-  background-size: 0.85rem;
-}
-
-.admin-toolbar-select:focus {
-  outline: none;
-  border-color: var(--color-primary);
 }
 
 .admin-toolbar-action {

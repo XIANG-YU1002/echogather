@@ -35,6 +35,12 @@ def _apply_character_stock(db, group_buy_product, product, character_quantities)
     無角色商品：清空每角色庫存、沿用 max_quantity。
     有角色商品：未指定的角色以 max_quantity 作為 fallback；並把 max_quantity
     同步為各角色數量總和（作為整體庫存的去正規化值）。
+
+    每角色上限可以是 0＝不接這個角色的單（Business Rules §20.4）。但有兩種
+    0 是不合理的，在這裡擋掉而不是讓資料庫 CHECK 噴 500：
+    - 商品只有一個角色時填 0：整個商品都不接了，應該取消勾選這個商品。
+    - 多角色全部填 0：同上，總和 0 也會違反商品層級的 max_quantity > 0。
+    另外已被訂單占用的角色不可調到占用量以下，與商品層級同一條規則。
     """
     characters = product_repository.get_characters(db, product.id)
     if not characters:
@@ -46,8 +52,35 @@ def _apply_character_stock(db, group_buy_product, product, character_quantities)
     total = 0
     for character in characters:
         qty = provided.get(character.id, group_buy_product.max_quantity)
+        if qty == 0 and len(characters) == 1:
+            raise AppError(
+                422,
+                "SINGLE_CHARACTER_QUANTITY_ZERO",
+                "此商品只有一個角色，接單上限至少為 1；不接單請取消勾選這個商品。",
+                {"character_id": str(character.id), "character_name": character.name},
+            )
+        occupied = order_repository.get_occupied_quantity(db, group_buy_product.id, character.id)
+        if qty < occupied:
+            raise AppError(
+                409,
+                "CHARACTER_MAX_QUANTITY_BELOW_OCCUPIED",
+                f"「{character.name}」的接單上限不可低於已占用數量。",
+                {
+                    "character_id": str(character.id),
+                    "character_name": character.name,
+                    "occupied_quantity": occupied,
+                },
+            )
         quantities.append((character.id, qty))
         total += qty
+
+    if total == 0:
+        raise AppError(
+            422,
+            "ALL_CHARACTER_QUANTITIES_ZERO",
+            "至少要有一個角色的接單上限大於 0；全部不接請取消勾選這個商品。",
+        )
+
     group_buy_repository.set_product_character_stock(db, group_buy_product.id, quantities)
     group_buy_product.max_quantity = total
 

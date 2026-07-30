@@ -12,3 +12,41 @@ body {
   background-color: #f7f7fb;
   color: #1f1f2e;
 }
+
+/* ---------------------------------------------------------------------------
+   下拉選單全站統一外觀
+   以圖 03 商品詳情頁「可跟團開團」的排序選單為標準（使用者 2026-07-30 指定）。
+   原本各頁自己寫一份，沒寫到的就落回瀏覽器原生樣式（Windows 上是灰底方框，
+   跟站內其他控制項完全不像），所以改成用元素選擇器當基準：
+   各頁只覆寫寬度、對齊等版面需求，不要再重寫邊框／圓角／箭頭。
+   appearance: none 是必要的——原生箭頭無法改樣式，關掉後用背景圖自繪，
+   右側 padding 要留出箭頭的位置。
+--------------------------------------------------------------------------- */
+select {
+  height: 40px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background-color: var(--color-surface);
+  padding: 0 2.2rem 0 0.9rem;
+  font-size: 0.9rem;
+  font-family: inherit;
+  color: var(--color-text);
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239a9aa8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.8rem center;
+  background-size: 0.8rem;
+}
+
+select:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+select:disabled {
+  background-color: var(--color-bg);
+  color: var(--color-text-muted);
+  cursor: not-allowed;
+}
