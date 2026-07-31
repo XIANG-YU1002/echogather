@@ -4,12 +4,21 @@
 使用 service_role key 呼叫 Storage REST API，DB 內儲存完整公開網址。
 """
 
+import logging
+
 import httpx
 
 from app.core.config import settings
 from app.core.errors import AppError
 
+logger = logging.getLogger(__name__)
+
 _bucket_ready = False
+
+
+def _response_detail(resp: httpx.Response) -> str:
+    """Supabase 的錯誤原因都在 body 裡，不記下來就只剩一個無用的狀態碼。"""
+    return f"status={resp.status_code} body={resp.text[:500]}"
 
 
 def _headers(extra: dict | None = None) -> dict:
@@ -48,9 +57,15 @@ def ensure_bucket() -> None:
         )
         # 409 = 已存在（併發情況），視為成功
         if create.status_code not in (200, 201, 409):
+            logger.error("建立 bucket %s 失敗：%s", bucket, _response_detail(create))
             raise AppError(502, "UPLOAD_STORAGE_ERROR", "圖片儲存服務初始化失敗。")
         _bucket_ready = True
-    except httpx.HTTPError as exc:
+    except AppError:
+        raise
+    except Exception as exc:
+        # httpx.InvalidURL 等例外不是 httpx.HTTPError 的子類，只攔 HTTPError
+        # 會讓它變成沒有訊息的 500。
+        logger.exception("連線圖片儲存服務失敗：bucket=%s", bucket)
         raise AppError(502, "UPLOAD_STORAGE_ERROR", "無法連線圖片儲存服務。") from exc
 
 
@@ -67,10 +82,12 @@ def upload_bytes(object_path: str, data: bytes, content_type: str = "image/webp"
             content=data,
             timeout=60,
         )
-    except httpx.HTTPError as exc:
+    except Exception as exc:
+        logger.exception("上傳圖片失敗：path=%s size=%s", object_path, len(data))
         raise AppError(502, "UPLOAD_STORAGE_ERROR", "圖片上傳失敗，請稍後再試。") from exc
 
     if resp.status_code not in (200, 201):
+        logger.error("上傳圖片被拒：path=%s %s", object_path, _response_detail(resp))
         raise AppError(502, "UPLOAD_STORAGE_ERROR", "圖片上傳失敗，請稍後再試。")
 
     return f"{url}/storage/v1/object/public/{bucket}/{object_path}"

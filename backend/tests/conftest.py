@@ -6,8 +6,21 @@ from sqlalchemy.orm import Session
 # 專案，見 docs/目前進度.txt），因此需要本機存在有效的 backend/.env。
 # 每個測試都在一個交易內執行，測試結束後 rollback，不會在 Supabase 留下任何資料。
 
+from app.core.config import settings  # noqa: E402
 from app.core.database import engine, get_db  # noqa: E402
 from app.main import app  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def _never_send_real_email(monkeypatch):
+    """測試絕不寄真信。
+
+    backend/.env 填了 SMTP 憑證之後，註冊驗證碼與重設密碼的測試會真的透過
+    Gmail 寄信到測試用的假信箱（會退信，也可能觸發 Gmail 的濫用限制）。
+    這裡把 smtp_user 清空，讓 mailer.send_email 走「未設定 SMTP」的分支
+    改寫 log——與 .env 沒有 SMTP 設定時的既有測試行為完全一致。
+    """
+    monkeypatch.setattr(settings, "smtp_user", "")
 
 
 @pytest.fixture()

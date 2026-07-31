@@ -1,15 +1,19 @@
 import io
+import logging
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
-from PIL import Image, UnidentifiedImageError
+import PIL
+from PIL import Image, UnidentifiedImageError, features
 
 from app.core import supabase_storage
 from app.core.config import settings
 from app.core.errors import AppError
 from app.models.enums import UserRole
 from app.models.user import AppUser
+
+logger = logging.getLogger(__name__)
 
 ALLOWED_CATEGORIES = {"avatar", "activity", "product"}
 
@@ -18,6 +22,15 @@ _ADMIN_ONLY_CATEGORIES = {"activity", "product"}
 _ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/jpg", "image/png", "image/webp"}
 _ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
 _ALLOWED_PIL_FORMATS = {"JPEG", "PNG", "WEBP"}
+
+
+def pillow_version() -> str:
+    return PIL.__version__
+
+
+def webp_encoder_available() -> bool:
+    """Pillow 是否具備 WebP 編碼能力（官方 wheel 內建，自行編譯的版本可能沒有）。"""
+    return bool(features.check("webp"))
 
 
 def _check_permission(current_user: AppUser, category: str) -> None:
@@ -49,6 +62,37 @@ def _load_and_verify_image(raw: bytes) -> Image.Image:
     return image
 
 
+def _encode_webp(image: Image.Image) -> bytes:
+    """轉存 WebP。轉檔失敗不能變成沒有訊息的 500，一定要留下可診斷的錯誤。"""
+    if not webp_encoder_available():
+        logger.error("Pillow %s 沒有 WebP 編碼器，無法轉檔。", pillow_version())
+        raise AppError(
+            500,
+            "UPLOAD_WEBP_UNSUPPORTED",
+            "伺服器缺少 WebP 轉檔支援，請聯絡管理員。",
+        )
+
+    buffer = io.BytesIO()
+    try:
+        image.save(buffer, format="WEBP")
+    except Exception as exc:  # Pillow 會依成因拋 OSError／ValueError／KeyError
+        # WebP 單邊上限 16383px，超過會在這裡失敗——訊息要能指向真正的原因。
+        logger.exception(
+            "WebP 轉檔失敗：mode=%s size=%s Pillow=%s",
+            image.mode,
+            image.size,
+            pillow_version(),
+        )
+        raise AppError(
+            500,
+            "UPLOAD_IMAGE_ENCODE_FAILED",
+            "圖片轉檔失敗，請改用其他圖片或稍後再試。",
+            {"mode": image.mode, "size": list(image.size)},
+        ) from exc
+
+    return buffer.getvalue()
+
+
 def save_image(
     current_user: AppUser,
     category: str,
@@ -71,9 +115,7 @@ def save_image(
     if image.mode not in ("RGB", "RGBA"):
         image = image.convert("RGBA" if "A" in image.getbands() else "RGB")
 
-    buffer = io.BytesIO()
-    image.save(buffer, format="WEBP")
-    webp_bytes = buffer.getvalue()
+    webp_bytes = _encode_webp(image)
 
     now = datetime.now(timezone.utc)
     stored_filename = f"{uuid.uuid4().hex}.webp"

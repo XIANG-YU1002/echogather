@@ -1,8 +1,12 @@
+import logging
 from typing import Any
 
 from fastapi import Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from starlette.middleware.base import BaseHTTPMiddleware
+
+logger = logging.getLogger(__name__)
 
 
 class AppError(Exception):
@@ -71,7 +75,35 @@ async def validation_error_handler(
 
 
 async def unhandled_error_handler(request: Request, exc: Exception) -> JSONResponse:
+    # 一定要記 traceback：註冊了 Exception handler 之後，Starlette 的
+    # ServerErrorMiddleware 就不會再把例外往上拋，uvicorn 預設的例外記錄
+    # 也不會觸發——不在這裡記，線上就完全查不到 500 的原因。
+    logger.exception(
+        "未處理的例外：%s %s", request.method, request.url.path, exc_info=exc
+    )
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content=_error_body("INTERNAL_SERVER_ERROR", "伺服器發生未預期錯誤。"),
     )
+
+
+class UnhandledErrorMiddleware(BaseHTTPMiddleware):
+    """把未處理例外攔在 CORSMiddleware 的內層。
+
+    app.add_exception_handler(Exception, ...) 是交給中介層堆疊**最外層**的
+    ServerErrorMiddleware 處理，它產生的回應不會再經過 CORSMiddleware，
+    因此 500 回應不帶 CORS 標頭，瀏覽器會把伺服器錯誤誤報成 CORS 錯誤
+    （查錯方向會被帶偏，見 docs/目前進度.txt 第 13 批）。
+
+    改在這裡攔下來，回應就會往外經過 CORS。註冊順序見 app/main.py。
+    """
+
+    async def dispatch(self, request: Request, call_next):
+        try:
+            return await call_next(request)
+        except AppError as exc:
+            # 正常情況下 AppError 已由內層的 app_error_handler 處理掉，
+            # 這裡只是保險，避免它落進下面的 500 分支。
+            return await app_error_handler(request, exc)
+        except Exception as exc:
+            return await unhandled_error_handler(request, exc)

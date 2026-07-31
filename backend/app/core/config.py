@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 480
     cors_allowed_origins: str = "http://localhost:5173"
     max_upload_file_size_bytes: int = 10 * 1024 * 1024
+    # 應用程式自己的 log 等級（uvicorn 只設定自己的 logger，不含 app.*）。
+    # 線上要查問題時可臨時改成 DEBUG。
+    log_level: str = "INFO"
 
     supabase_url: str = ""
     supabase_service_role_key: str = ""
