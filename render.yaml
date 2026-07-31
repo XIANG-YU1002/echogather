@@ -1,0 +1,67 @@
+# Render 部署設定（後端 FastAPI）
+#
+# 用法：在 Render 建立 Blueprint 並指向這個 repo，它會讀這份檔案自動建立服務。
+# 機密值一律設 sync: false —— Render 會在網頁上要你手動填，不會寫進 git。
+#
+# 前端不在這裡：前端走 GitHub Pages，由 .github/workflows/deploy-frontend.yml 部署。
+#
+# 注意（免費方案）：
+#   - 15 分鐘沒有請求會休眠，下一個訪客要等 30～50 秒喚醒
+#   - 每次部署會重建環境，本機磁碟不保留（圖片本來就存 Supabase Storage，不受影響）
+#   - Migration 不在這裡自動跑：alembic 走 Session pooler，從本機執行即可
+#     （見 docs/部署指南.md）
+
+services:
+  - type: web
+    name: wuwagroup-api
+    runtime: python
+    plan: free
+    region: singapore # 離 Supabase 的 ap-south-1 較近
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.10"
+
+      # ---- 資料庫（Supabase）----
+      # 應用程式用 Transaction pooler（6543）；Session pooler（5432）只有 15 個連線。
+      - key: DATABASE_URL
+        sync: false
+      # Migration 用，線上其實用不到（從本機跑），留著方便日後需要時使用
+      - key: ALEMBIC_DATABASE_URL
+        sync: false
+
+      # ---- 安全性 ----
+      # 正式環境務必用一組全新的隨機字串，不要沿用本機開發用的
+      - key: JWT_SECRET_KEY
+        sync: false
+
+      # ---- 前端網址 ----
+      # CORS 允許來源；GitHub Pages 網址，多個以逗號分隔
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+      # 重設密碼信件裡的連結會指向這裡
+      - key: FRONTEND_BASE_URL
+        sync: false
+
+      # ---- Supabase Storage（圖片）----
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_STORAGE_BUCKET
+        value: media
+
+      # ---- Email（Gmail SMTP）----
+      - key: SMTP_HOST
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: SMTP_FROM_NAME
+        value: EchoGather
