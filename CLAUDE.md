@@ -17,6 +17,8 @@
 ## 其他慣例
 - Header 固定不動，以現有為主（除非使用者另行授權）。
 - 品牌名：EchoGather｜鳴潮周邊團購平台。
-- 圖片裁切功能延後，目前為原始檔直傳。
+- 圖片上傳已含裁切：選檔後出現裁切框（活動封面建議 16:9，商品主圖同介面），
+  可縮放拖曳，並提供「直接使用原圖」與「套用裁切並上傳」兩種送出方式。
+  未點送出鈕就不會真的上傳（自動化操作時要注意這一步）。
 - 資料庫為 Supabase 專案 `kjziqgiqiwknxqejancr`（Session pooler，region ap-south-1）；
   `backend/.env`、`venv`、`frontend/.env`、`node_modules` 皆為 .gitignore 排除項，需重建。
