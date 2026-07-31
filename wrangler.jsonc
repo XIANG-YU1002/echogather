@@ -9,6 +9,10 @@
   // Worker 名稱會成為網址的第一段：<name>.<帳號子網域>.workers.dev
   // 取 www 是為了讓網址讀起來像 www.品牌.網域，而不是 品牌.帳號名.workers.dev
   "name": "www",
+  // 用 API token 部署（GitHub Actions）時 wrangler 無法自行判斷要部署到哪個帳號，
+  // 必須明確指定；本機用 OAuth 登入時則會自動帶入，所以只有 CI 會踩到這個。
+  // Account ID 不是機密，它本來就出現在 Cloudflare Dashboard 的網址列。
+  "account_id": "78e7d5a2d00f5f8ab64f88295cfcdb26",
   "compatibility_date": "2025-01-01",
   "assets": {
     "directory": "./frontend/dist",
