@@ -9,9 +9,14 @@ import react from "@vitejs/plugin-react";
 // 同時 Render 的 FRONTEND_BASE_URL 也要一起更新（重設密碼信的連結會用到）。
 const GITHUB_PAGES_BASE = "/echogather/";
 
+// 部署在自己網域根目錄的平台（Cloudflare Workers／Pages、Vercel…）要用 "/"，
+// 在那邊的建置環境設 DEPLOY_BASE=/ 即可，GitHub Pages 不設就沿用上面的值。
+// 兩個平台因此可以並存，不必二選一。
+const deployBase = process.env.DEPLOY_BASE || GITHUB_PAGES_BASE;
+
 export default defineConfig(({ command }) => ({
   plugins: [react()],
-  base: command === "build" ? GITHUB_PAGES_BASE : "/",
+  base: command === "build" ? deployBase : "/",
   server: {
     port: 5173,
   },

@@ -1,0 +1,17 @@
+{
+  // Cloudflare Workers（Static Assets 模式）部署設定。
+  //
+  // 前端是純靜態的 Vite 產物，這裡只是把 frontend/dist 當成靜態資源掛上去，
+  // 沒有任何 Worker 程式碼。後端仍在 Render，不受影響。
+  //
+  // 與 GitHub Pages 並存：兩邊都會部署同一份程式碼，差別只在 base path
+  // （見 frontend/vite.config.js 的 DEPLOY_BASE）。
+  "name": "echogather",
+  "compatibility_date": "2025-01-01",
+  "assets": {
+    "directory": "./frontend/dist",
+    // SPA 的關鍵：找不到實體檔案時回傳 index.html 且狀態碼是 **200**，
+    // 不像 GitHub Pages 只能靠 404.html（狀態碼是 404，對 SEO 不利）。
+    "not_found_handling": "single-page-application"
+  }
+}
