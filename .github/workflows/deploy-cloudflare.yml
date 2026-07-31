@@ -49,14 +49,12 @@ jobs:
           VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
         run: npm run build
 
+      # 刻意不用 cloudflare/wrangler-action：它會把 wrangler 的實際錯誤吞掉，
+      # 只回「The process ... failed with exit code 1」，完全無從除錯
+      # （為此連續失敗三次都查不出原因）。直接跑指令，輸出才看得到。
+      # 版本釘在與本機一致的 4.116.0：預設的 3.90.0 解析不了本專案
+      # wrangler.jsonc 用到的 JSONC 註解與 Static Assets 設定。
       - name: Deploy to Cloudflare Workers
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          # 必須指定版本：wrangler-action 預設會裝 3.90.0，而這個專案的
-          # wrangler.jsonc 用了較新的功能（JSONC 註解、Static Assets 的
-          # not_found_handling），3.x 解析不了，會以 exit code 1 失敗且不說原因。
-          # 版本與本機部署所用的一致，避免兩邊行為不同。
-          wranglerVersion: "4.116.0"
-          # 不指定 command，預設就是在專案根目錄執行 wrangler deploy，
-          # 會讀 wrangler.jsonc 把 frontend/dist 當靜態資源上傳。
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: npx --yes wrangler@4.116.0 deploy
