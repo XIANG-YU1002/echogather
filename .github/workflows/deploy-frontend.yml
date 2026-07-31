@@ -46,6 +46,8 @@ jobs:
           # 後端上線後到 repo Settings → Secrets and variables → Actions → Variables
           # 新增 VITE_API_BASE_URL，例如 https://your-api.onrender.com/api/v1
           VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+          # 寫進 index.html 的 build-version meta，用來確認線上跑的是哪一版
+          VITE_BUILD_VERSION: ${{ github.sha }}
         run: npm run build
 
       - name: Add SPA fallback

@@ -24,6 +24,8 @@ Set-Location (Join-Path $root "frontend")
 #   VITE_API_BASE_URL     漏了前端會退回 localhost:8000，線上抓不到任何資料
 $env:DEPLOY_BASE = "/"
 $env:VITE_API_BASE_URL = "https://wuwagroup-api.onrender.com/api/v1"
+# 寫進 index.html 的 build-version meta，方便日後確認線上是哪一版
+$env:VITE_BUILD_VERSION = (git rev-parse --short HEAD).Trim()
 
 npm run build
 if ($LASTEXITCODE -ne 0) { throw "前端建置失敗" }

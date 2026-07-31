@@ -3,6 +3,13 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--
+      線上跑的是哪一版：值由建置時的 VITE_BUILD_VERSION 帶入（CI 用 commit SHA，
+      本機部署腳本用 git short hash），沒設定時是 dev。
+      用途是確認部署有沒有真的生效——兩個前端網址各自部署，光看畫面分不出
+      哪邊還停在舊版，查這個 meta 最快。
+    -->
+    <meta name="build-version" content="%VITE_BUILD_VERSION%" />
     <title>EchoGather｜鳴潮周邊團購平台</title>
   </head>
   <body>

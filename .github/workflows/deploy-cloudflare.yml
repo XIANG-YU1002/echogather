@@ -50,6 +50,8 @@ jobs:
           # 少了這個會建置成 /echogather/（GitHub Pages 用的），JS/CSS 全部 404。
           DEPLOY_BASE: "/"
           VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+          # 寫進 index.html 的 build-version meta，用來確認線上跑的是哪一版
+          VITE_BUILD_VERSION: ${{ github.sha }}
         run: npm run build
 
       # 刻意不用 cloudflare/wrangler-action：它會把 wrangler 的實際錯誤吞掉，
