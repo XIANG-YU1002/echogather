@@ -11,20 +11,14 @@ name: Deploy frontend to Cloudflare
 #             模板建立；放 Secrets 而非 Variables，才會加密且不寫進 log）
 #   Variables → VITE_API_BASE_URL（與 GitHub Pages 那份共用，已設定）
 
-# 2026-07-31：自動部署連續四次失敗，錯誤訊息始終只有
-# 「The process ... failed with exit code 1」，已排除 account_id 與 wrangler
-# 版本兩個原因，剩下最可能是 API token 的權限範圍。
-# 暫時關掉 push 觸發，避免每次推送都跑失敗、寄一封通知信；
-# 前端改用 scripts/deploy-cloudflare.ps1 手動部署（見 docs/部署指南.md）。
-# 之後若想再試，把下面的 push 區塊取消註解即可。
 on:
-  # push:
-  #   branches: [main]
-  #   paths:
-  #     - "frontend/**"
-  #     - "wrangler.jsonc"
-  #     - ".github/workflows/deploy-cloudflare.yml"
-  workflow_dispatch: # 只保留手動觸發
+  push:
+    branches: [main]
+    paths:
+      - "frontend/**"
+      - "wrangler.jsonc"
+      - ".github/workflows/deploy-cloudflare.yml"
+  workflow_dispatch: # 允許在 Actions 頁面手動觸發
 
 concurrency:
   group: cloudflare-deploy
@@ -38,7 +32,10 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          # 必須 22 以上：wrangler 4.x 要求 Node >= 22，用 20 會直接拒絕執行
+          # （這就是 2026-07-31 連續四次部署失敗的真正原因，
+          #   錯誤訊息藏在 log 中段，被結尾的 exit code 1 掩蓋掉）
+          node-version: "22"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
