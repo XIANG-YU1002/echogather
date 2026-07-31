@@ -495,9 +495,11 @@ export default function OrderDetailPage() {
             </div>
             <div className="oc-row">
               <span className="label">主要聯絡方式</span>
-              <span className="value od-leader-contact">
+              <span className="value contact-inline">
                 {LeaderContactIcon && <LeaderContactIcon className="oc-contact-icon" />}
-                {CONTACT_PLATFORM_LABELS[order.contact_platform]}：
+                <span className="oc-contact-platform">
+                  {CONTACT_PLATFORM_LABELS[order.contact_platform]}：
+                </span>
                 <ContactValue
                   platform={order.contact_platform}
                   value={order.contact_value}

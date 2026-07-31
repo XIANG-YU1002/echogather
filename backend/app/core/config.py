@@ -4,7 +4,15 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
+    # 應用程式連線：Supabase Transaction pooler（port 6543）。
+    # Session pooler（5432）全專案只有 15 個連線，實測 10 台併發就會噴
+    # XX_MAXCONN_SESSION；Transaction mode 的連線可在交易之間重用，
+    # 才撐得住多人同時操作。
     database_url: str
+    # Migration 專用連線：alembic 走 Session pooler（5432）。
+    # 建表／改索引這類 DDL 在 transaction mode 下行為較不穩定，而且 migration
+    # 是偶爾執行、不需要高併發。留空時退回使用 database_url。
+    alembic_database_url: str = ""
     jwt_secret_key: str
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 480

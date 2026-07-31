@@ -24,12 +24,23 @@ export function facebookHref(value) {
 export default function ContactValue({ platform, value, displayName, className }) {
   const href = platform === "facebook" ? facebookHref(value) : null;
 
+  // 資訊列一律維持單排，值放不下時會在尾端省略；title 讓完整值仍看得到。
   if (!href) {
-    return <span className={className}>{value}</span>;
+    return (
+      <span className={className} title={value || undefined}>
+        {value}
+      </span>
+    );
   }
 
   return (
-    <a className={className} href={href} target="_blank" rel="noreferrer noopener">
+    <a
+      className={className}
+      href={href}
+      title={value}
+      target="_blank"
+      rel="noreferrer noopener"
+    >
       {displayName || "Facebook 頁面"}
     </a>
   );

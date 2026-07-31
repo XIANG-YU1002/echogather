@@ -144,16 +144,15 @@ input[type="checkbox"] {
   margin-left: 0.2rem;
 }
 
-/* select 的外觀走 global.css 的全站基準，這裡只管 input／textarea */
-.form-field input,
+/*
+ * input／textarea／select 的外觀一律走 global.css 的全站基準
+ * （白底、1px 邊框、10px 圓角、40px 高、0.9rem）。
+ * 這裡原本自己宣告了 8px 圓角與 0.95rem，是全站最大的一組外觀偏離
+ * （影響管理員表單、團主建立開團等頁），2026-07-31 依使用者要求移除，
+ * 只保留 textarea 的高度這類「版面需求」。
+ */
 .form-field textarea {
-  padding: 0.55rem 0.75rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  font-size: 0.95rem;
-  font-family: inherit;
-  background-color: #fff;
-  color: var(--color-text);
+  min-height: 7rem;
 }
 
 .form-field input:focus,
@@ -704,9 +703,9 @@ input[type="checkbox"] {
 }
 
 /* 外觀走 global.css 的全站基準；這裡只把高度拉到與同列的膠囊搜尋框一致 */
+/* 高度走 global.css 的 40px 基準（原本自己設 44px，與其他頁的下拉不齊） */
 .admin-toolbar-select {
   flex-shrink: 0;
-  height: 44px;
 }
 
 .admin-toolbar-action {

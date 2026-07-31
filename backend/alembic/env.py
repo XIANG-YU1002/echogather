@@ -7,7 +7,11 @@ from app.core.config import settings
 from app.models import Base
 
 config = context.config
-config.set_main_option("sqlalchemy.url", settings.database_url)
+# 應用程式走 Transaction pooler（6543）以支撐併發，但 DDL 走 Session pooler（5432）
+# 比較穩定；ALEMBIC_DATABASE_URL 沒設定時退回 DATABASE_URL。
+config.set_main_option(
+    "sqlalchemy.url", settings.alembic_database_url or settings.database_url
+)
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)

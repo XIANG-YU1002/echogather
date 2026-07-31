@@ -34,7 +34,7 @@ export default function AdminLayout() {
           <Link to="/admin" className="app-logo">
             <img src={logoIcon} className="app-logo-icon" alt="" />
             <span className="app-logo-text">
-              <span className="app-logo-title">WuWaGroup</span>
+              <span className="app-logo-title">EchoGather</span>
               <span className="app-logo-subtitle">鳴潮周邊團購平台</span>
             </span>
           </Link>

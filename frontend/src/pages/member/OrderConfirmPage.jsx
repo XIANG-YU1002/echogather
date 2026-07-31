@@ -154,17 +154,20 @@ export default function OrderConfirmPage() {
     { label: "收單期限", value: formatDeadline(groupBuy.deadline_at) },
     {
       label: "團主主要聯絡方式",
-      // Facebook 的值是一長串網址，直接印會把左邊的標籤壓成一個字一行
+      // Facebook 的值是一長串網址，直接印會把左邊的標籤壓成一個字一行；
+      // 平台名＋ID 也比其他列長，套用與訂單詳情頁同一組「維持單排」的樣式。
       value: (
-        <>
-          {CONTACT_PLATFORM_LABELS[groupBuy.contact_platform]}：
+        <span className="contact-inline">
+          <span className="oc-contact-platform">
+            {CONTACT_PLATFORM_LABELS[groupBuy.contact_platform]}：
+          </span>
           <ContactValue
             platform={groupBuy.contact_platform}
             value={groupBuy.contact_value}
             displayName={groupBuy.group_leader.display_name}
             className="oc-contact-link"
           />
-        </>
+        </span>
       ),
     },
   ];

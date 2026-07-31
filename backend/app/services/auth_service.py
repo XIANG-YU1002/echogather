@@ -214,9 +214,15 @@ def verify_password_reset_token(db: Session, token: str) -> bool:
 
 
 def login(db: Session, payload: LoginRequest) -> tuple[str, int]:
-    """依 Business Rules §6.3/§6.5：登入失敗不得透露 Email 是否存在，成功回傳 Access Token。"""
-    user = user_repository.get_by_email(db, payload.email)
-    if user is None or not verify_password(payload.password, user.password_hash):
-        raise AppError(401, "AUTH_INVALID_CREDENTIALS", "Email 或密碼錯誤。")
+    """依 Business Rules §6.3/§6.5：登入失敗不得透露 Email 是否存在，成功回傳 Access Token。
 
-    return create_access_token(user.id)
+    同一個 Email 可能同時有管理員與一般用戶兩個帳號（使用者 2026-07-31 裁決：
+    兩者是分開的身分），因此逐一比對密碼，由密碼決定登入哪一個。
+    list_by_email 讓管理員排在前面，兩邊密碼相同時登入管理員，既有管理員帳號
+    的行為不會因為別人用同 Email 註冊而改變。
+    """
+    for user in user_repository.list_by_email(db, payload.email):
+        if verify_password(payload.password, user.password_hash):
+            return create_access_token(user.id)
+
+    raise AppError(401, "AUTH_INVALID_CREDENTIALS", "Email 或密碼錯誤。")

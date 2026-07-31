@@ -334,7 +334,7 @@ export default function NotificationsPage() {
                           <div className="nc-item-actions">
                             <Button
                               variant="secondary"
-                              onClick={() => openUnmergeModal(notification)}
+                              onClick={() => setUnmergeTarget(notification)}
                             >
                               取消合併訂單
                             </Button>
