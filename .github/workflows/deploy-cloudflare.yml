@@ -1,0 +1,57 @@
+name: Deploy frontend to Cloudflare
+
+# 把前端同時部署到 Cloudflare Workers（主要網址 www.echogather.workers.dev）。
+#
+# 與 deploy-frontend.yml（GitHub Pages）並存：兩者跑同一份程式碼，
+# 差別只在 base path。原本 Cloudflare 這份要人工跑 wrangler deploy，
+# 靠「記得做」遲早會漏，導致兩個網址版本不一致——所以改成自動。
+#
+# 需要在 repo 設定：
+#   Secrets → CLOUDFLARE_API_TOKEN（於 Cloudflare 用 "Edit Cloudflare Workers"
+#             模板建立；放 Secrets 而非 Variables，才會加密且不寫進 log）
+#   Variables → VITE_API_BASE_URL（與 GitHub Pages 那份共用，已設定）
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "frontend/**"
+      - "wrangler.jsonc"
+      - ".github/workflows/deploy-cloudflare.yml"
+  workflow_dispatch: # 允許在 Actions 頁面手動觸發
+
+concurrency:
+  group: cloudflare-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build
+        working-directory: frontend
+        env:
+          # Cloudflare 部署在網域根目錄，base 必須是 "/"；
+          # 少了這個會建置成 /echogather/（GitHub Pages 用的），JS/CSS 全部 404。
+          DEPLOY_BASE: "/"
+          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+        run: npm run build
+
+      - name: Deploy to Cloudflare Workers
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          # 不指定 command，預設就是在專案根目錄執行 wrangler deploy，
+          # 會讀 wrangler.jsonc 把 frontend/dist 當靜態資源上傳。
