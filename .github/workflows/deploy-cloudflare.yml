@@ -53,5 +53,10 @@ jobs:
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          # 必須指定版本：wrangler-action 預設會裝 3.90.0，而這個專案的
+          # wrangler.jsonc 用了較新的功能（JSONC 註解、Static Assets 的
+          # not_found_handling），3.x 解析不了，會以 exit code 1 失敗且不說原因。
+          # 版本與本機部署所用的一致，避免兩邊行為不同。
+          wranglerVersion: "4.116.0"
           # 不指定 command，預設就是在專案根目錄執行 wrangler deploy，
           # 會讀 wrangler.jsonc 把 frontend/dist 當靜態資源上傳。
