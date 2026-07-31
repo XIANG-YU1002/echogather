@@ -2,7 +2,16 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+    # str_strip_whitespace：所有字串設定自動去除前後空白。
+    # 線上圖片上傳曾整批失敗，原因是 Render 的 SUPABASE_URL 值開頭多了一個
+    # tab（貼上時帶進去的），組出 "\thttps://…" 讓 httpx 在解析階段就拋
+    # InvalidURL——而它不是 httpx.HTTPError 的子類，逃過攔截變成沒有訊息的
+    # 500。環境變數是手動貼上的，前後空白必須在入口就清掉。
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        str_strip_whitespace=True,
+    )
 
     # 應用程式連線：Supabase Transaction pooler（port 6543）。
     # Session pooler（5432）全專案只有 15 個連線，實測 10 台併發就會噴
