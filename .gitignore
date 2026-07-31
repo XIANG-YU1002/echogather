@@ -10,6 +10,10 @@ frontend/node_modules/
 frontend/dist/
 frontend/.env
 
+# Deploy
+# wrangler 的本地暫存與狀態（部署時自動產生，不需要進版控）
+.wrangler/
+
 # OS
 .DS_Store
 Thumbs.db

@@ -6,7 +6,9 @@
   //
   // 與 GitHub Pages 並存：兩邊都會部署同一份程式碼，差別只在 base path
   // （見 frontend/vite.config.js 的 DEPLOY_BASE）。
-  "name": "echogather",
+  // Worker 名稱會成為網址的第一段：<name>.<帳號子網域>.workers.dev
+  // 取 www 是為了讓網址讀起來像 www.品牌.網域，而不是 品牌.帳號名.workers.dev
+  "name": "www",
   "compatibility_date": "2025-01-01",
   "assets": {
     "directory": "./frontend/dist",
