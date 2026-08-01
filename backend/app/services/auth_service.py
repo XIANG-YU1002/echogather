@@ -1,4 +1,5 @@
 import hashlib
+import logging
 import secrets
 from datetime import datetime, timedelta, timezone
 
@@ -23,6 +24,9 @@ from app.schemas.user import (
     SendVerificationCodeRequest,
     SendVerificationCodeResponse,
 )
+
+
+logger = logging.getLogger(__name__)
 
 
 def _hash_code(code: str) -> str:
@@ -73,6 +77,9 @@ def send_verification_code(
     try:
         mailer.send_verification_code(email, code, ttl_minutes)
     except Exception as error:  # noqa: BLE001 — 寄信失敗要回報給使用者而非讓 500 洩漏細節
+        # 一定要記 traceback：包成 AppError 之後就走 app_error_handler，
+        # 不會留下任何線索。線上曾因此只能靠回應時間推斷 Render 封鎖了 SMTP。
+        logger.exception("驗證碼寄送失敗，收件人=%s", email)
         raise AppError(
             502, "VERIFICATION_CODE_SEND_FAILED", "驗證碼寄送失敗，請稍後再試。"
         ) from error
@@ -175,6 +182,7 @@ def request_password_reset(
     try:
         mailer.send_password_reset(user.email, user.nickname, reset_url, ttl_minutes)
     except Exception as error:  # noqa: BLE001 — 寄信失敗要回報給使用者而非 500
+        logger.exception("重設密碼信寄送失敗，收件人=%s", user.email)
         raise AppError(
             502, "PASSWORD_RESET_SEND_FAILED", "重設信件寄送失敗，請稍後再試。"
         ) from error

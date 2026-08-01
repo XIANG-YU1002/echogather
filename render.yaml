@@ -54,7 +54,27 @@ services:
       - key: SUPABASE_STORAGE_BUCKET
         value: media
 
+      # ---- Email（Gmail API，走 HTTPS）----
+      # Render 免費方案封鎖對外 SMTP：實測 587 連線要等到 20 秒逾時才失敗，
+      # 而本機用同一組憑證 1.8 秒就能登入 Gmail，證明不是憑證問題而是網路層被擋。
+      # 所以線上一律走 Gmail API（gmail.googleapis.com:443），不要用 SMTP。
+      # 這三個值以 scripts/get_gmail_refresh_token.py 取得，詳見該檔說明。
+      # 注意：OAuth 同意畫面必須是「已發布」狀態，測試中狀態的 refresh token
+      # 只有 7 天有效期。
+      - key: GMAIL_CLIENT_ID
+        sync: false
+      - key: GMAIL_CLIENT_SECRET
+        sync: false
+      - key: GMAIL_REFRESH_TOKEN
+        sync: false
+      # 寄件信箱（必須是授權該 refresh token 的那個 Gmail 帳號）
+      - key: GMAIL_SENDER
+        sync: false
+      - key: SMTP_FROM_NAME
+        value: EchoGather
+
       # ---- Email（Gmail SMTP）----
+      # 僅供本機開發；線上填了也不會生效，因為 Gmail API 優先且 SMTP 被封鎖。
       - key: SMTP_HOST
         value: smtp.gmail.com
       - key: SMTP_PORT
@@ -63,5 +83,3 @@ services:
         sync: false
       - key: SMTP_PASSWORD
         sync: false
-      - key: SMTP_FROM_NAME
-        value: EchoGather

@@ -1,7 +1,12 @@
-"""Email 寄送（Gmail SMTP）與信件版型。
+"""Email 寄送與信件版型。
 
-未設定 SMTP 帳號密碼時不會真的寄信，改為把內容寫進後端 log，
-讓本機開發不必先申請帳號就能測試完整流程。
+寄送管道依序擇一（見 send_email）：
+  1. Gmail API（OAuth2，走 HTTPS）——**線上環境用這條**。
+     Render 免費方案封鎖對外 SMTP：實測 587 連線逾時 20 秒才失敗，而本機用
+     同一組憑證 1.8 秒就能登入，證明不是憑證問題而是網路層被擋。
+  2. Gmail SMTP（smtplib）——本機開發用，本機沒有封鎖。
+  3. 兩者都沒設定時不會真的寄信，改為把內容寫進後端 log，
+     讓本機開發不必先申請帳號就能測試完整流程。
 
 信件一律同時提供 HTML 與純文字版本（multipart/alternative）：
 不支援 HTML 的信件軟體會退回純文字，不會看到一堆標籤。
@@ -9,13 +14,66 @@ HTML 部分刻意使用 table 佈局與 inline style——多數信件軟體
 （尤其 Outlook、Gmail）會剝除 <style> 區塊與現代 CSS 版面屬性。
 """
 
+import base64
 import logging
 import smtplib
+import time
 from email.message import EmailMessage
+
+import httpx
 
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
+
+_GMAIL_TOKEN_URL = "https://oauth2.googleapis.com/token"
+_GMAIL_SEND_URL = "https://gmail.googleapis.com/gmail/v1/users/me/messages/send"
+
+# access token 有效約一小時，快取起來，不必每封信都多打一次 OAuth
+_access_token: str | None = None
+_access_token_expires_at: float = 0.0
+
+
+def _gmail_access_token() -> str:
+    """用 refresh token 換 access token（快取至到期前 60 秒）。"""
+    global _access_token, _access_token_expires_at
+    now = time.time()
+    if _access_token and now < _access_token_expires_at:
+        return _access_token
+
+    resp = httpx.post(
+        _GMAIL_TOKEN_URL,
+        data={
+            "client_id": settings.gmail_client_id,
+            "client_secret": settings.gmail_client_secret,
+            "refresh_token": settings.gmail_refresh_token,
+            "grant_type": "refresh_token",
+        },
+        timeout=30,
+    )
+    if resp.status_code != 200:
+        # invalid_grant 最常見的原因是 OAuth 同意畫面仍停在「測試中」，
+        # 該狀態下 Google 發的 refresh token 只有 7 天有效期。
+        raise RuntimeError(
+            f"換取 Gmail access token 失敗：{resp.status_code} {resp.text[:300]}"
+        )
+
+    data = resp.json()
+    _access_token = data["access_token"]
+    _access_token_expires_at = now + int(data.get("expires_in", 3600)) - 60
+    return _access_token
+
+
+def _send_via_gmail_api(message: EmailMessage) -> None:
+    raw = base64.urlsafe_b64encode(message.as_bytes()).decode()
+    resp = httpx.post(
+        _GMAIL_SEND_URL,
+        headers={"Authorization": f"Bearer {_gmail_access_token()}"},
+        json={"raw": raw},
+        timeout=30,
+    )
+    if resp.status_code not in (200, 201):
+        raise RuntimeError(f"Gmail API 寄信失敗：{resp.status_code} {resp.text[:300]}")
 
 _BRAND = "EchoGather"
 _BRAND_SUBTITLE = "鳴潮周邊團購平台"
@@ -96,10 +154,13 @@ def _wrap_html(heading: str, intro: str, body_html: str, footer_note: str) -> st
 
 
 def send_email(to: str, subject: str, text_body: str, html_body: str | None = None) -> None:
-    """寄送信件。寄送失敗時拋出例外，由呼叫端決定如何處理。"""
-    if not settings.smtp_enabled:
+    """寄送信件。寄送失敗時拋出例外，由呼叫端決定如何處理。
+
+    管道優先序：Gmail API（線上）> SMTP（本機）> 只寫 log。
+    """
+    if not settings.mail_enabled:
         logger.warning(
-            "SMTP 未設定，未實際寄信。收件人=%s 主旨=%s\n%s",
+            "未設定寄信管道（Gmail API 與 SMTP 皆無），未實際寄信。收件人=%s 主旨=%s\n%s",
             to,
             subject,
             text_body,
@@ -108,11 +169,15 @@ def send_email(to: str, subject: str, text_body: str, html_body: str | None = No
 
     message = EmailMessage()
     message["Subject"] = subject
-    message["From"] = f"{settings.smtp_from_name} <{settings.smtp_user}>"
+    message["From"] = f"{settings.smtp_from_name} <{settings.mail_sender_address}>"
     message["To"] = to
     message.set_content(text_body)
     if html_body:
         message.add_alternative(html_body, subtype="html")
+
+    if settings.gmail_api_enabled:
+        _send_via_gmail_api(message)
+        return
 
     with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=20) as smtp:
         smtp.starttls()

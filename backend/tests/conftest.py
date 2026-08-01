@@ -15,12 +15,15 @@ from app.main import app  # noqa: E402
 def _never_send_real_email(monkeypatch):
     """測試絕不寄真信。
 
-    backend/.env 填了 SMTP 憑證之後，註冊驗證碼與重設密碼的測試會真的透過
-    Gmail 寄信到測試用的假信箱（會退信，也可能觸發 Gmail 的濫用限制）。
-    這裡把 smtp_user 清空，讓 mailer.send_email 走「未設定 SMTP」的分支
-    改寫 log——與 .env 沒有 SMTP 設定時的既有測試行為完全一致。
+    backend/.env 填了寄信憑證之後，註冊驗證碼與重設密碼的測試會真的寄信到
+    測試用的假信箱（會退信，也可能觸發 Gmail 的濫用限制）。
+    這裡把兩條寄信管道的憑證都清空，讓 mailer.send_email 走「未設定寄信管道」
+    的分支改寫 log——與 .env 沒有任何寄信設定時的既有測試行為一致。
+
+    兩個都要清：mailer 會優先走 Gmail API，只清 smtp_user 攔不住它。
     """
     monkeypatch.setattr(settings, "smtp_user", "")
+    monkeypatch.setattr(settings, "gmail_refresh_token", "")
 
 
 @pytest.fixture()

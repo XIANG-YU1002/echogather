@@ -42,6 +42,16 @@ class Settings(BaseSettings):
     smtp_user: str = ""
     smtp_password: str = ""
     smtp_from_name: str = "EchoGather"
+
+    # Gmail API（OAuth2）寄信：線上環境用這條路。
+    # Render 免費方案封鎖對外 SMTP（實測 587 連線逾時 20 秒，本機同一組憑證卻能登入），
+    # 所以線上不能走 smtplib；Gmail API 走 https://gmail.googleapis.com:443，不受影響。
+    # 三個值都設定時優先使用 Gmail API，否則退回 SMTP（本機開發照舊）。
+    gmail_client_id: str = ""
+    gmail_client_secret: str = ""
+    gmail_refresh_token: str = ""
+    # 寄件信箱；留空時沿用 smtp_user（必須是授權該 refresh token 的那個 Gmail 帳號）
+    gmail_sender: str = ""
     # 信件裡的重設密碼連結要指向前端頁面，部署時需改成正式網址
     frontend_base_url: str = "http://localhost:5173"
     password_reset_ttl_minutes: int = 30
@@ -54,6 +64,21 @@ class Settings(BaseSettings):
     @property
     def smtp_enabled(self) -> bool:
         return bool(self.smtp_user and self.smtp_password)
+
+    @property
+    def gmail_api_enabled(self) -> bool:
+        return bool(
+            self.gmail_client_id and self.gmail_client_secret and self.gmail_refresh_token
+        )
+
+    @property
+    def mail_sender_address(self) -> str:
+        """寄件信箱：Gmail API 用 gmail_sender（留空則沿用 smtp_user）。"""
+        return self.gmail_sender or self.smtp_user
+
+    @property
+    def mail_enabled(self) -> bool:
+        return self.gmail_api_enabled or self.smtp_enabled
 
     @property
     def cors_allowed_origins_list(self) -> list[str]:
