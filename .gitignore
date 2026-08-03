@@ -14,6 +14,10 @@ frontend/.env
 # wrangler 的本地暫存與狀態（部署時自動產生，不需要進版控）
 .wrangler/
 
+# Logs
+# 測試／除錯 log 含本機路徑與資料庫連線資訊，一律不進版控
+*.log
+
 # OS
 .DS_Store
 Thumbs.db

@@ -3116,7 +3116,7 @@ announcement
 5. 確認至少選擇一項商品
 6. 驗證商品皆屬於該活動
 7. 驗證商品皆為 active
-8. 驗證付款方式及 other 說明
+8. 驗證付款方式（僅 bank_transfer／cash_on_delivery）與選填的付款方式備註
 9. 驗證滿贈設定
 10. 建立 group_buy
 11. 建立所有 group_buy_product
@@ -4325,7 +4325,11 @@ erDiagram
 
 1. 第一版使用 PostgreSQL。
 2. ORM 使用 SQLAlchemy。
-3. Migration 使用 Alembic。
+3. Migration 使用 Alembic，並採 **forward-only** 政策：正式環境只執行
+   `upgrade`，永不執行 `downgrade`。要回到舊結構一律以「還原備份」處理。
+   各 migration 檔內的 `downgrade()` 僅供本機空庫實驗，**不保證有資料時可用**
+   （已知 `0003 → 0002` 在有多角色訂單時必然失敗）。操作規範見《部署指南》
+   「Migration 政策」。
 4. Primary Key 使用 UUID。
 5. 時間使用 TIMESTAMPTZ，資料庫保存 UTC。
 6. 金額使用 NUMERIC(12,2)。

@@ -1349,20 +1349,23 @@ currency = TWD
 
 ## 15.5 Payment Methods
 
-付款方式支援：
+付款方式僅支援兩種：
 
 ```text
 bank_transfer
 cash_on_delivery
-other
 ```
 
-顯示文字可對應：
+顯示文字對應：
 
 - 匯款（`bank_transfer`）
 - 取貨付款（`cash_on_delivery`）
 
-> 變更紀錄（2026-07-27）：依使用者決議移除 `other` 付款方式。
+不提供「其他」付款方式。任何額外的付款細節一律寫在付款方式備註
+（`payment_method_note`），不再新增 enum 值。
+
+> 變更紀錄（2026-07-27）：移除 `other` 付款方式（Migration `0004`）。
+> 2026-08-03 再次確認維持兩種，本節為現行規格。
 
 付款方式備註（`payment_method_note`）：
 

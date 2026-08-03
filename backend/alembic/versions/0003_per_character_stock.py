@@ -84,6 +84,14 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    # 警告：本專案採 forward-only migration，正式環境不執行 downgrade。
+    # 這個 downgrade 只能在「空資料庫」上跑。已實測確認：只要資料庫裡存在
+    # 多角色訂單，下面重建 uq_order_item_order_product 這一步就必然失敗
+    #   could not create unique index "uq_order_item_order_product"
+    #   Key (order_id, group_buy_product_id) is duplicated
+    # 因為 0003 之後同一訂單的同一商品可以有多筆不同角色的 order_item，
+    # 舊的唯一約束本來就容不下這種資料。要回退請改用「還原備份」，
+    # 詳見 docs/部署指南.md「Migration 政策」。
     op.drop_constraint(
         "uq_order_item_order_product_character", "order_item", type_="unique"
     )

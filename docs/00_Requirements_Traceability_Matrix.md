@@ -54,7 +54,7 @@
 | GroupLeaderApplicationStatus | pending, approved, rejected | group_leader_application.status |
 | ActivityStatus | open, ended | activity.status |
 | GroupBuyStatus | open, closed | group_buy.status |
-| PaymentMethod | bank_transfer, cash_on_delivery, other | group_buy.payment_method |
+| PaymentMethod | bank_transfer, cash_on_delivery | group_buy.payment_method |
 | ContactPlatform | facebook, discord, line | group_buy.contact_platform |
 | OrderStatus | pending_confirmation, pending_payment, paid, shipped, completed, cancelled, rejected | group_order.status |
 | CancellationStatus | pending, approved, rejected | cancellation_request.status |

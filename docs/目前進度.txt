@@ -3920,9 +3920,10 @@ frontend/node_modules（npm install）。
 線上圖片上傳與寄信都已修好並在正式站實測通過（見第 14、15 批）。
 
 待辦：
-  1. **Alembic downgrade 0003 -> 0002 在有資料時必然失敗**（見第 14 批第 8 節）。
-     要修就得讓該 downgrade 先處理重複的 order_item，或明確放棄還原
-     uq_order_item_order_product。**驗證前務必先確認測試環境真的隔離**。
+  1. ~~Alembic downgrade 0003 -> 0002 在有資料時必然失敗~~
+     **已於 2026-08-03 裁決：不修，專案正式改採 forward-only migration。**
+     正式環境不執行 downgrade，回退一律還原備份。已同步寫入 04_Database_Design
+     §15.3、部署指南「Migration 政策」與 0003 檔內註解。原因見第 14 批第 8 節。
   2. 「潮聲信籤系列」的**開團尚未建立**（活動與商品已就緒）。要開團的話，
      每角色接單上限依商品圖標示設 3。
   3. **寄出的信會進垃圾郵件匣**（見第 15 批第 8 節）。自己測試時點一次

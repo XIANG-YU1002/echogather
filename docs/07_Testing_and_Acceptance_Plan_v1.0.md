@@ -185,7 +185,7 @@
 - Ended activities: `3.3 官方周邊`、`日本二周年線下活動`。
 - Active and inactive products in the same activity.
 - Products with one character, multiple characters and no character.
-- Group buys using bank transfer, cash on delivery／pickup payment and other payment method.
+- Group buys using bank transfer and cash on delivery／pickup payment，兩者皆含「有付款方式備註」與「無備註」各一組。
 
 ## 7.3 Data Rules
 
@@ -372,7 +372,7 @@
 | GB-003 | P1 | 至少一項且只能選該活動 active 商品 | 多活動、active/inactive products | 提交空 products、跨活動、inactive、重複商品 | 各自 422／409；不建立部分開團 | BR 15.3 | Not Run |
 | GB-004 | P1 | 付款方式銀行匯款 | L-02 | payment_method=bank_transfer | 建立成功；不要求 payment_method_note | BR 15.5 | Not Run |
 | GB-005 | P1 | 取貨付款付款方式 | L-02 | payment_method=cash_on_delivery | 建立成功；商品頁可用「付款方式＝取貨付款」篩選找到 | BR 15.5；17.3 | Not Run |
-| GB-006 | P1 | 其他付款方式必填說明 | L-02 | payment_method=other，分別不傳與傳入說明 | 無說明 422；有說明成功並公開顯示 | BR 15.5 | Not Run |
+| GB-006 | P1 | 付款方式備註選填且拒絕已移除的 other | L-02 | 分別提交：不帶備註、帶備註、payment_method=other | 前兩者皆建立成功且備註如實顯示於公開頁；other 回 422（enum 不接受） | BR 15.5 | Not Run |
 | GB-007 | P1 | 二補、滿贈與期限驗證 | open activity | 提交期限已過、滿贈不符合活動、有效組合 | 無效拒絕；有效建立 | BR 15.6～15.8 | Not Run |
 | GB-008 | P1 | 團規與主要聯絡不可空 | L-02 | 團規或 contact_value 空白 | 422；不建立開團 | BR 15.9 | Not Run |
 | GB-009 | P1 | 無正式訂單時可完整編輯 | 開團 order_count=0 | 修改付款、二補、滿贈、團規、期限、聯絡、價格、上限、增刪商品 | 全部合法欄位成功；公開頁立即反映 | BR 16.1～16.2 | Not Run |

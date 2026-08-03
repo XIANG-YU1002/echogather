@@ -27,7 +27,7 @@ const STAT_META = {
 
 const PAYMENT_METHOD_LABELS = {
   bank_transfer: "匯款",
-  cash_on_delivery: "貨到付款",
+  cash_on_delivery: "取貨付款",
 };
 
 // 目前開團不分頁，資料一次全部載入，排序純前端處理
