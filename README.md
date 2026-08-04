@@ -1,4 +1,4 @@
-# WuWaGroup
+# EchoGather
 
 《鳴潮》官方周邊開團資訊整合與跟團管理平台。
 
