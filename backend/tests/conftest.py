@@ -7,8 +7,29 @@ from sqlalchemy.orm import Session
 # 每個測試都在一個交易內執行，測試結束後 rollback，不會在 Supabase 留下任何資料。
 
 from app.core.config import settings  # noqa: E402
-from app.core.database import engine, get_db  # noqa: E402
+from app.core.database import get_db  # noqa: E402
 from app.main import app  # noqa: E402
+from tests._isolation import (  # noqa: E402
+    IsolationConfigError,
+    assert_isolated_connection,
+    get_test_engine,
+)
+
+
+def pytest_configure(config):
+    """測試資料庫隔離 guard（specs/002-test-db-isolation）。
+
+    在收集／執行任何測試之前檢查：
+    G1 已設定 TEST_DATABASE_URL（絕不退回 DATABASE_URL）、
+    G2 測試 schema 不是 public、
+    G3/G4 實連確認 search_path 生效且測試 schema 存在。
+    任一不通過即中止整個 pytest session（已執行案例數 0）。
+    """
+    try:
+        test_engine = get_test_engine()
+        assert_isolated_connection(test_engine, settings.test_database_schema)
+    except IsolationConfigError as exc:
+        raise pytest.UsageError(f"\n[測試資料庫隔離] {exc}") from exc
 
 
 @pytest.fixture(autouse=True)
@@ -28,7 +49,9 @@ def _never_send_real_email(monkeypatch):
 
 @pytest.fixture()
 def db_session():
-    connection = engine.connect()
+    # 002-test-db-isolation：連線一律走測試專用 engine（search_path 釘在測試
+    # schema、不含 public），絕不使用 app.core.database.engine（主要資料庫）。
+    connection = get_test_engine().connect()
     transaction = connection.begin()
     session = Session(bind=connection, join_transaction_mode="create_savepoint")
 

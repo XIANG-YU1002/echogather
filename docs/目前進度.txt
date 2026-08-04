@@ -3959,3 +3959,53 @@ frontend/node_modules（npm install）。
   - 圖片素材在 frontend/src/assets 的**系列子資料夾**底下
     （予世新聲系列／潮聲信籤系列），不是直接放在 assets 根目錄
   - 其餘沿用第 11 批「接續時要注意」的四點
+
+====================================
+2026-08-04：D-02 測試資料庫隔離完成（specs/002-test-db-isolation）
+====================================
+
+【本批完成項目】
+
+1. 測試資料庫隔離（正式規格差異項 D-02，已解決）
+   - 走完整 SDD 流程：spec → plan → research → tasks → implement，
+     文件都在 specs/002-test-db-isolation/
+   - pytest 一律改用 TEST_DATABASE_URL（Session pooler 5432）連往
+     同一 Supabase 專案內的獨立 schema wuwa_test（軟隔離）
+   - 防呆（backend/tests/_isolation.py）：未設 TEST_DATABASE_URL 直接中止
+     （絕不退回 DATABASE_URL）；TEST_DATABASE_SCHEMA 禁止 public；
+     實連驗證 current_schema()；schema 不存在時提示先跑建置腳本
+   - 建置腳本 backend/scripts/build_test_schema.py：DROP/CREATE wuwa_test
+     後以 alembic upgrade head 重建全部結構（可重複執行）
+   - conftest.py 改用獨立 test engine；交易回滾與寄信攔截機制原樣保留
+   - 安全測試 backend/tests/test_db_isolation_guard.py（10 案例）
+
+2. 驗證結果（全部實測）
+   - 完整 pytest 258 案例全數通過（約 30 分鐘，跨國連線本來就這速度）
+   - 主庫 public 前後快照（26 表 813 筆）完全一致；wuwa_test 測後全空
+   - 錯誤設定情境：0 個測試被執行即中止
+   - 不設 TEST_DATABASE_URL 啟動網站：/api/v1/health 200，正式運作零影響
+
+3. 文件同步
+   - CURRENT_DECISIONS.md → v1.3（§14 差異標記、§16.2 已解決）
+   - EchoGather_Product_Specification_v1.0.md → v1.1（§19.3、§21 D-02 已實作）
+
+【本批修改的程式檔案】
+   - 修改：backend/app/core/config.py（新增 test_database_url、
+     test_database_schema 兩個設定欄位，應用程式不讀取）
+   - 修改：backend/alembic/env.py（支援外部傳入 connection 與
+     version_table_schema，正式 migration 路徑行為不變）
+   - 修改：backend/tests/conftest.py（guard + test engine 切換）
+   - 新增：backend/tests/_isolation.py、backend/tests/test_db_isolation_guard.py、
+     backend/scripts/build_test_schema.py
+   - app/core/database.py、alembic/versions/、業務程式碼、前端：一行未動
+
+【接手時要注意（本批新增）】
+   - backend/.env 需有 TEST_DATABASE_URL（本機值同 DATABASE_URL，
+     隔離靠 schema 不靠連線字串）；重建環境後先跑
+     venv\Scripts\python scripts\build_test_schema.py 再跑 pytest
+   - 主庫新增 migration 後，測試 schema 要重跑 build_test_schema.py 追上
+   - SET search_path 必須在 autocommit 下執行（_isolation.py 已處理）：
+     否則會被連線池歸還時的 rollback 撤銷、連線落回 public——
+     這是本批實測抓到的 bug，test_db_isolation_guard.py 有回歸測試
+   - 本機 DATABASE_URL 實際上是 Session pooler（5432）；
+     「應用程式走 Transaction pooler 6543」指的是 Render 線上環境

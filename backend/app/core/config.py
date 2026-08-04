@@ -22,6 +22,12 @@ class Settings(BaseSettings):
     # 建表／改索引這類 DDL 在 transaction mode 下行為較不穩定，而且 migration
     # 是偶爾執行、不需要高併發。留空時退回使用 database_url。
     alembic_database_url: str = ""
+    # 測試專用連線（Session pooler 5432）與測試 schema：只有 pytest
+    # （tests/_isolation.py）和 scripts/build_test_schema.py 會讀取，
+    # 應用程式任何執行路徑都不使用。留空時測試會直接中止，不會退回
+    # database_url——這是刻意設計，避免測試打到主要資料庫。
+    test_database_url: str = ""
+    test_database_schema: str = "wuwa_test"
     jwt_secret_key: str
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 480
