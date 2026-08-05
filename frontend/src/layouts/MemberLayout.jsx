@@ -36,6 +36,11 @@ export default function MemberLayout() {
     return <Navigate to="/login" replace />;
   }
 
+  // D-06：Admin 只使用管理後台，不得進入會員專屬頁面（後端另有強制阻擋）
+  if (user?.permissions?.is_admin) {
+    return <Navigate to="/admin" replace />;
+  }
+
   const navItems = [
     ...BASE_NAV_ITEMS,
     user?.group_leader ? LEADER_NAV_ITEM : APPLICATION_NAV_ITEM,

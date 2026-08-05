@@ -104,6 +104,12 @@ export default function GroupLeaderLayout() {
     return <Navigate to="/login" replace state={{ redirectPath: location.pathname }} />;
   }
 
+  // D-06：Admin 不得進入團主後台，一律導向管理後台（要在團主資料檢查之前，
+  // 即使 Admin 帳號意外持有團主資料也不得進入）
+  if (user?.permissions?.is_admin) {
+    return <Navigate to="/admin" replace />;
+  }
+
   if (!user.group_leader) {
     return <Navigate to="/" replace />;
   }

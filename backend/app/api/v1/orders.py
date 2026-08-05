@@ -3,7 +3,7 @@ import uuid
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import PaginationParams, get_current_user, get_db
+from app.api.deps import PaginationParams, get_current_member_user, get_db
 from app.core.responses import envelope, paginated_envelope
 from app.models.enums import OrderStatus
 from app.models.user import AppUser
@@ -20,7 +20,7 @@ router = APIRouter(prefix="/orders", tags=["orders"])
 @router.post("", status_code=status.HTTP_201_CREATED)
 def create_order(
     payload: CreateOrderRequest,
-    current_user: AppUser = Depends(get_current_user),
+    current_user: AppUser = Depends(get_current_member_user),
     db: Session = Depends(get_db),
 ) -> dict:
     result = order_service.create_order(db, current_user, payload.rules_accepted)
@@ -34,7 +34,7 @@ def get_my_orders(
     group_leader_name: str | None = Query(None, max_length=50),
     created_within_days: int | None = Query(None, ge=1, le=365),
     pagination: PaginationParams = Depends(),
-    current_user: AppUser = Depends(get_current_user),
+    current_user: AppUser = Depends(get_current_member_user),
     db: Session = Depends(get_db),
 ) -> dict:
     items, total = order_service.get_my_orders(
@@ -55,7 +55,7 @@ def get_my_orders(
 @router.get("/{order_id}")
 def get_my_order_detail(
     order_id: uuid.UUID,
-    current_user: AppUser = Depends(get_current_user),
+    current_user: AppUser = Depends(get_current_member_user),
     db: Session = Depends(get_db),
 ) -> dict:
     result = order_service.get_my_order_detail(db, current_user, order_id)
@@ -66,7 +66,7 @@ def get_my_order_detail(
 def create_cancellation_request(
     order_id: uuid.UUID,
     payload: CreateCancellationRequestRequest,
-    current_user: AppUser = Depends(get_current_user),
+    current_user: AppUser = Depends(get_current_member_user),
     db: Session = Depends(get_db),
 ) -> dict:
     result = cancellation_service.create_cancellation_request(
@@ -79,7 +79,7 @@ def create_cancellation_request(
 def create_unmerge_request(
     order_id: uuid.UUID,
     payload: CreateUnmergeRequestRequest,
-    current_user: AppUser = Depends(get_current_user),
+    current_user: AppUser = Depends(get_current_member_user),
     db: Session = Depends(get_db),
 ) -> dict:
     """提出取消合併（拆單）申請，由團主核准後才真正拆回原本的多張訂單。"""

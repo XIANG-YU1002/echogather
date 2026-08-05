@@ -64,6 +64,21 @@ def db_session():
 
 
 @pytest.fixture()
+def admin_headers(client, db_session: Session):
+    """已登入 Admin 的授權標頭（specs/003-admin-permission-hardening）。
+
+    沿用既有 factories/utils 的建立方式，只是把 role 設為 admin；
+    各 admin API 測試檔內既有的 _admin_headers helper 不受影響。
+    """
+    from app.models.enums import UserRole
+    from tests.factories import create_user
+    from tests.utils import auth_headers, login
+
+    admin = create_user(db_session, role=UserRole.ADMIN)
+    return auth_headers(login(client, admin.email, "Passw0rd1"))
+
+
+@pytest.fixture()
 def client(db_session: Session):
     def _override_get_db():
         yield db_session

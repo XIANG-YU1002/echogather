@@ -15,6 +15,7 @@ __all__ = [
     "get_db",
     "get_current_user",
     "get_current_user_optional",
+    "get_current_member_user",
     "get_current_group_leader_profile",
     "get_current_active_group_leader_profile",
     "get_current_admin_user",
@@ -59,11 +60,25 @@ def get_current_user_optional(
     return db.get(AppUser, user_id)
 
 
-def get_current_group_leader_profile(
+def get_current_member_user(
     current_user: AppUser = Depends(get_current_user),
+) -> AppUser:
+    """依 CD §2.2/§3.1/§13.1（D-06）：Admin 是獨立管理用途帳號，不得使用收藏、
+    購物車、訂單、團主申請與團主後台；會員專屬 API 一律掛本 Dependency。"""
+    if current_user.role == UserRole.ADMIN:
+        raise AppError(
+            403, "ADMIN_MEMBER_ACCESS_FORBIDDEN", "管理員帳號不可使用會員或團主功能。"
+        )
+    return current_user
+
+
+def get_current_group_leader_profile(
+    current_user: AppUser = Depends(get_current_member_user),
     db: Session = Depends(get_db),
 ) -> GroupLeaderProfile:
-    """依 API Design §4.6：需已擁有 group_leader_profile（資料不須已完成）。"""
+    """依 API Design §4.6：需已擁有 group_leader_profile（資料不須已完成）。
+    掛在 get_current_member_user 之下，Admin 會先收到 403 角色拒絕（D-06，FR-006），
+    而不是 404 GROUP_LEADER_PROFILE_NOT_FOUND。"""
     profile = group_leader_repository.get_profile_by_user_id(db, current_user.id)
     if profile is None:
         raise AppError(404, "GROUP_LEADER_PROFILE_NOT_FOUND", "找不到團主資料。")
